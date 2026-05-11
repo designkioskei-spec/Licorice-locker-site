@@ -14,7 +14,7 @@
       raw = 0;
     }
     if (mqMobile.matches) {
-      raw = Math.round(raw * 0.42);
+      raw = Math.round(raw * 0.58);
     }
     return raw;
   }
@@ -51,7 +51,7 @@
           obs.unobserve(t);
         });
       },
-      { root: null, rootMargin: "0px 0px -10% 0px", threshold: 0.06 }
+      { root: null, rootMargin: "0px 0px -15% 0px", threshold: 0.11 }
     );
 
     nodes.forEach(function (el) {

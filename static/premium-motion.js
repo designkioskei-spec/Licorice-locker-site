@@ -7,19 +7,110 @@
 
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var coarse = window.matchMedia("(pointer: coarse)").matches;
+  var mobileMq = window.matchMedia("(max-width: 639px)");
+
+  function clamp(min, value, max) {
+    return Math.max(min, Math.min(max, value));
+  }
 
   function initLenis() {
     if (reduce || typeof window.Lenis === "undefined") {
       return;
     }
-    var isMobile = window.matchMedia("(max-width: 639px)").matches;
+    var isMobile = mobileMq.matches;
     new window.Lenis({
-      lerp: isMobile ? 0.11 : 0.085,
-      wheelMultiplier: isMobile ? 0.92 : 0.78,
-      touchMultiplier: isMobile ? 1.05 : 0.95,
+      lerp: isMobile ? 0.088 : 0.062,
+      wheelMultiplier: isMobile ? 0.9 : 0.74,
+      touchMultiplier: isMobile ? 1.08 : 0.92,
       syncTouch: true,
       autoRaf: true,
     });
+  }
+
+  function depthAmount(el) {
+    var isMobile = mobileMq.matches;
+    if (
+      el.classList.contains("shop-hero-banner") ||
+      el.classList.contains("top-banner") ||
+      el.classList.contains("aff-banner")
+    ) {
+      return isMobile ? 20 : 38;
+    }
+    if (
+      el.classList.contains("magazine-product-row") ||
+      el.classList.contains("link-series-promo")
+    ) {
+      return isMobile ? 16 : 28;
+    }
+    if (
+      el.classList.contains("shop-intro") ||
+      el.classList.contains("listening-room-intro") ||
+      el.classList.contains("panel") ||
+      el.classList.contains("hero")
+    ) {
+      return isMobile ? 11 : 20;
+    }
+    if (el.classList.contains("product-card")) {
+      return isMobile ? 8 : 14;
+    }
+    return isMobile ? 10 : 18;
+  }
+
+  function initScrollDepth() {
+    if (reduce) {
+      return;
+    }
+
+    var nodes = Array.prototype.slice.call(
+      document.querySelectorAll("[data-ll-reveal]")
+    );
+    if (!nodes.length) {
+      return;
+    }
+
+    var rafId = 0;
+    var outPad = 180;
+
+    function step() {
+      rafId = 0;
+      var vh = window.innerHeight || 1;
+      var viewMid = vh * 0.5;
+
+      for (var i = 0; i < nodes.length; i++) {
+        var el = nodes[i];
+        if (!el.classList.contains("ll-reveal-visible")) {
+          el.style.setProperty("--ll-depth-y", "0px");
+          continue;
+        }
+
+        var rect = el.getBoundingClientRect();
+        var out = rect.bottom < -outPad || rect.top > vh + outPad;
+        if (out || rect.height < 2) {
+          el.style.setProperty("--ll-depth-y", "0px");
+          continue;
+        }
+
+        var mid = rect.top + rect.height * 0.5;
+        var n = clamp(-1, (mid - viewMid) / (vh * 0.5), 1);
+        var drift = -n * depthAmount(el);
+
+        if (Math.abs(drift) < 0.35) {
+          drift = 0;
+        }
+
+        el.style.setProperty("--ll-depth-y", drift.toFixed(2) + "px");
+      }
+    }
+
+    function kick() {
+      if (!rafId) {
+        rafId = window.requestAnimationFrame(step);
+      }
+    }
+
+    kick();
+    window.addEventListener("scroll", kick, { passive: true });
+    window.addEventListener("resize", kick, { passive: true });
   }
 
   function bindHeroPointer(root) {
@@ -133,7 +224,7 @@
     if (reduce || coarse) {
       return;
     }
-    var maxPx = 3;
+    var maxPx = mobileMq.matches ? 0 : 4.5;
     document.querySelectorAll(".btn.primary").forEach(function (btn) {
       if (btn.closest(".admin") || btn.dataset.llMagnetic === "0") {
         return;
@@ -160,6 +251,7 @@
   function init() {
     initTypography();
     initLenis();
+    initScrollDepth();
     initHeroChoreography();
     initMagneticPrimaryButtons();
   }

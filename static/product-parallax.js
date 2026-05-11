@@ -23,14 +23,13 @@
     ".page-listening-room .link-series-promo-img",
   ].join(",");
 
-  var LERP = 0.13;
+  var LERP = 0.105;
   var EPS = 0.02;
   var OUT_PAD = 120;
 
   function maxShiftPx() {
-    /* Prior caps 25.2 / 36.4px → ×1.7 (+70%); mobile still 50% of base */
-    var base = document.body.classList.contains("page-listening-room") ? 61.88 : 42.84;
-    if (window.matchMedia("(max-width: 768px)").matches) base *= 0.5;
+    var base = document.body.classList.contains("page-listening-room") ? 86 : 68;
+    if (window.matchMedia("(max-width: 768px)").matches) base *= 0.62;
     return base;
   }
 
@@ -52,6 +51,12 @@
     if (n > 1) n = 1;
     if (n < -1) n = -1;
     return -n * maxPx;
+  }
+
+  function scaleFor(currentY, maxPx) {
+    if (maxPx <= 0) return 1;
+    var intensity = 1 - Math.min(1, Math.abs(currentY) / maxPx);
+    return 1.015 + intensity * 0.03;
   }
 
   var imgs = [];
@@ -87,7 +92,12 @@
       }
 
       img.style.willChange = "transform";
-      img.style.transform = "translate3d(0, " + next.toFixed(2) + "px, 0)";
+      img.style.transform =
+        "translate3d(0, " +
+        next.toFixed(2) +
+        "px, 0) scale(" +
+        scaleFor(next, maxPx).toFixed(3) +
+        ")";
     }
 
     if (moving) rafId = window.requestAnimationFrame(step);
