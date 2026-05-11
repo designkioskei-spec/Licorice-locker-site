@@ -15,6 +15,12 @@
     ".page-shop .melody-banner-img",
     ".page-shop .allegro-banner-img",
     ".page-shop .link-series-promo-img",
+    ".page-listening-room .soundwave-banner-img",
+    ".page-listening-room .riff-banner-img",
+    ".page-listening-room .harmony-banner-img",
+    ".page-listening-room .melody-banner-img",
+    ".page-listening-room .allegro-banner-img",
+    ".page-listening-room .link-series-promo-img",
   ].join(",");
 
   var LERP = 0.13;

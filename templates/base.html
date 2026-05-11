@@ -639,7 +639,9 @@
   </div>
   <script src="{{ url_for('static', filename='cart-upsell.js') }}" defer></script>
   {% if request.endpoint in ('shop', 'listening_room', 'affiliate_landing') %}
+  <script src="{{ url_for('static', filename='lenis.min.js') }}" defer></script>
   <script src="{{ url_for('static', filename='scroll-reveal.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='premium-motion.js') }}" defer></script>
   {% endif %}
   {% if request.endpoint in ('shop', 'listening_room') %}
   <script src="{{ url_for('static', filename='product-parallax.js') }}" defer></script>
