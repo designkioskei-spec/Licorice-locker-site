@@ -2,7 +2,7 @@
 {% block title %}Shop — Licorice Locker{% endblock %}
 {% block body_class %}page-shop{% endblock %}
 {% block content %}
-<section class="shop-hero-banner" aria-label="Featured">
+<section class="shop-hero-banner" aria-label="Featured" data-ll-reveal="up">
   <p class="shop-hero-banner-tagline">Art inspired by music</p>
   <img
     class="shop-hero-banner-img"
@@ -15,14 +15,14 @@
   >
 </section>
 
-<section class="shop-intro" aria-label="About Liquorice Locker">
+<section class="shop-intro" aria-label="About Liquorice Locker" data-ll-reveal="up" data-ll-reveal-delay="32">
   <p class="shop-intro-text">
     Liquorice Locker is where music becomes art — a design-led collection of minimalist vinyl record displays inspired by architecture, album artwork, and the emotional power of sound. Created by designer Joshua French, each piece is made to let the record take centre stage, turning the albums you love into sculptural pieces that shape the atmosphere of a room. Instead of hiding music in crates or shelves, Liquorice Locker brings it into the open, where colour, typography, and soundwave artwork become part of your space and part of your identity. Designed with simplicity, precision, and timeless materials, each display doesn’t compete with the music — it frames it.
   </p>
 </section>
 
 {% if sound_wave_product %}
-<section class="soundwave-showcase magazine-product-row magazine-product-row--start" aria-label="Sound Wave product">
+<section class="soundwave-showcase magazine-product-row magazine-product-row--start" aria-label="Sound Wave product" data-ll-reveal="left">
   <div class="soundwave-showcase-inner magazine-showcase-inner">
     <div class="shop-showcase-card magazine-product-block">
       <a class="soundwave-banner-link" href="{{ url_for('product_detail', slug='sound-wave') }}">
@@ -60,7 +60,7 @@
 {% endif %}
 
 {% if riff_product %}
-<section class="riff-showcase magazine-product-row magazine-product-row--end magazine-product-row--stagger" aria-label="Riff product">
+<section class="riff-showcase magazine-product-row magazine-product-row--end magazine-product-row--stagger" aria-label="Riff product" data-ll-reveal="right">
   <div class="riff-showcase-inner magazine-showcase-inner">
     <div class="riff-column shop-showcase-card magazine-product-block">
       <div class="riff-visual">
@@ -96,7 +96,7 @@
 {% endif %}
 
 {% if harmony_product %}
-<section class="harmony-showcase magazine-product-row magazine-product-row--start" aria-label="Harmony product">
+<section class="harmony-showcase magazine-product-row magazine-product-row--start" aria-label="Harmony product" data-ll-reveal="left">
   <div class="harmony-showcase-inner magazine-showcase-inner">
     <div class="harmony-column shop-showcase-card magazine-product-block">
       <div class="harmony-visual">
@@ -132,7 +132,7 @@
 {% endif %}
 
 {% if melody_product %}
-<section class="melody-showcase magazine-product-row magazine-product-row--end magazine-product-row--stagger" aria-label="Melody product">
+<section class="melody-showcase magazine-product-row magazine-product-row--end magazine-product-row--stagger" aria-label="Melody product" data-ll-reveal="right">
   <div class="melody-showcase-inner magazine-showcase-inner">
     <div class="melody-column shop-showcase-card magazine-product-block">
       <div class="melody-visual">
@@ -168,7 +168,7 @@
 {% endif %}
 
 {% if allegro_product %}
-<section class="allegro-showcase magazine-product-row magazine-product-row--start" aria-label="Allegra product">
+<section class="allegro-showcase magazine-product-row magazine-product-row--start" aria-label="Allegra product" data-ll-reveal="left">
   <div class="allegro-showcase-inner magazine-showcase-inner">
     <div class="allegro-column shop-showcase-card magazine-product-block">
       <div class="allegro-visual">
@@ -203,10 +203,12 @@
 </section>
 {% endif %}
 
+{% set grid_reveal = namespace(i=0) %}
 <div class="product-grid">
   {% for p in products %}
   {% if p.slug != 'sound-wave' and p.slug != 'riff' and p.slug != 'harmony' and p.slug != 'melody' and p.slug != 'allegro' %}
-  <article class="product-card {% if p.is_main %}product-main{% endif %}">
+  <article class="product-card {% if p.is_main %}product-main{% endif %}" data-ll-reveal="{{ 'left' if grid_reveal.i % 2 == 0 else 'right' }}" data-ll-reveal-delay="{{ grid_reveal.i * 28 }}">
+  {% set grid_reveal.i = grid_reveal.i + 1 %}
     {% if p.is_main %}<span class="badge">Main</span>{% endif %}
     <h2><a class="product-card-title-link" href="{{ url_for('product_detail', slug=p.slug) }}">{{ p.name }}</a></h2>
     <p class="price"><span data-nzd-cents="{{ p.price_cents }}">{{ format_money(p.price_cents) }}</span></p>

@@ -2,7 +2,7 @@
 {% block title %}{{ page.headline }} — Licorice Locker{% endblock %}
 {% block body_class %}affiliate-landing{% endblock %}
 {% block content %}
-<div class="aff-banner" {% if page.banner_image_url %}style="background-image: linear-gradient(120deg, rgba(37,24,29,0.88), rgba(37,24,29,0.45)), url('{{ affiliate_media_src(page.banner_image_url) }}');"{% endif %}>
+<div class="aff-banner" data-ll-reveal="up" {% if page.banner_image_url %}style="background-image: linear-gradient(120deg, rgba(37,24,29,0.88), rgba(37,24,29,0.45)), url('{{ affiliate_media_src(page.banner_image_url) }}');"{% endif %}>
   <div class="aff-banner-inner">
     <p class="eyebrow">The Listening Room</p>
     <h1>{{ page.headline }}</h1>
@@ -14,21 +14,21 @@
   </div>
 </div>
 
-<section class="panel">
+<section class="panel" data-ll-reveal="up" data-ll-reveal-delay="24">
   <p class="lede">{{ page.description }}</p>
   <p class="muted small">A tracking cookie was set so purchases from this device credit this member&apos;s Listening Room.</p>
 </section>
 
 {% include '_link_series_banner.html' %}
 
-<section class="hero">
+<section class="hero" data-ll-reveal="up" data-ll-reveal-delay="20">
   <h2>Products</h2>
   <p class="muted">Catalog is fixed — members cannot change names, prices, or features.</p>
 </section>
 
 <div class="product-grid">
   {% for p in products %}
-  <article class="product-card {% if p.is_main %}product-main{% endif %}">
+  <article class="product-card {% if p.is_main %}product-main{% endif %}" data-ll-reveal="{{ 'left' if loop.index0 % 2 == 0 else 'right' }}" data-ll-reveal-delay="{{ loop.index0 * 24 }}">
     {% if p.is_main %}<span class="badge">Main — Sound Wave</span>{% endif %}
     <h3><a class="product-card-title-link" href="{{ url_for('product_detail', slug=p.slug) }}">{{ p.name }}</a></h3>
     <p class="price"><span data-nzd-cents="{{ p.price_cents }}">{{ format_money(p.price_cents) }}</span></p>
@@ -45,7 +45,7 @@
   {% endfor %}
 </div>
 
-<div class="panel actions-row">
+<div class="panel actions-row" data-ll-reveal="up" data-ll-reveal-delay="16">
   <a class="btn primary" href="{{ url_for('cart_view') }}">View cart</a>
 </div>
 {% endblock %}
