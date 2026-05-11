@@ -1,83 +1,228 @@
 {% extends "base.html" %}
 {% block title %}{{ page.headline }} — Licorice Locker{% endblock %}
-{% block body_class %}page-shop page-listening-room luxury-xp listening-room-xp{% if page.banner_image_url and page.banner_image_url.strip() %} listening-room--has-banner{% endif %}{% endblock %}
-{% block head %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.css" crossorigin="anonymous">
-<link rel="stylesheet" href="{{ url_for('static', filename='luxury-experience.css') }}">
-{% endblock %}
+{% block body_class %}page-shop page-listening-room{% endblock %}
 {% block content %}
-{% set lr_h = (affiliate.id * 47) % 360 %}
-<div class="lux-ambient-root" style="--lr-mood-h: {{ lr_h }};">
-<section class="lux-lr-hero" aria-label="Listening Room">
-  <div class="lux-lr-hero__media" aria-hidden="true">
-    <img src="{{ listening_room_banner_url }}" alt="" width="1920" height="1080" fetchpriority="high" decoding="async">
-  </div>
-  <div class="lux-lr-hero__scrim" aria-hidden="true"></div>
-  <div class="lux-lr-hero__grain" aria-hidden="true"></div>
-  <div class="lux-lr-hero__content">
-    <p class="lux-lr-hero__label" data-lux-reveal>The Listening Room</p>
-    {% set hparts = page.headline.split(' ', 1) %}
-    <h1 class="lux-lr-hero__title lux-lr-hero__title--split" aria-label="{{ page.headline }}">
-      {% if hparts|length > 1 %}
-      <span class="lux-lr-hero__title-line">{{ hparts[0] }}</span>
-      <span class="lux-lr-hero__title-line lux-hero__title-line--ghost">{{ hparts[1] }}</span>
-      {% else %}
-      <span class="lux-lr-hero__title-line">{{ page.headline }}</span>
-      {% endif %}
-    </h1>
-    {% if page.tagline %}
-    <p class="lux-lr-hero__tagline" data-lux-reveal>{{ page.tagline }}</p>
-    {% endif %}
-    {% if page.instagram_url or page.tiktok_url %}
-    <div class="lux-lr-hero__social" data-lux-reveal>
-      {% if page.instagram_url %}<a href="{{ page.instagram_url }}" target="_blank" rel="noopener noreferrer">Instagram</a>{% endif %}
-      {% if page.tiktok_url %}<a href="{{ page.tiktok_url }}" target="_blank" rel="noopener noreferrer">TikTok</a>{% endif %}
-    </div>
-    {% endif %}
-  </div>
+<section class="top-banner" aria-label="Listening Room banner">
+  <img src="{{ listening_room_banner_url }}" alt="{{ page.headline }}">
+  <p class="top-banner-tagline">{{ page.headline }}</p>
 </section>
 
-{% if page.description %}
-<section class="lux-voice lux-voice--lr" aria-label="About this Listening Room">
-  <div class="lux-voice__grid">
-    <p class="lux-voice__anchor" data-lux-reveal>Room</p>
-    <div class="lux-voice__body">
-      <p class="lux-voice__text" data-lux-reveal>{{ page.description }}</p>
+<section class="shop-intro listening-room-intro" aria-label="About this Listening Room">
+  {% if page.tagline %}
+  <p class="shop-intro-text">{{ page.tagline }}</p>
+  {% endif %}
+  {% if page.description %}
+  <p class="shop-intro-text">{{ page.description }}</p>
+  {% endif %}
+  {% if page.instagram_url or page.tiktok_url %}
+  <div class="listening-room-social">
+    {% if page.instagram_url %}<a href="{{ page.instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}
+    {% if page.tiktok_url %}<a href="{{ page.tiktok_url }}" target="_blank" rel="noopener">TikTok</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+
+{% if sound_wave_product %}
+<section class="soundwave-showcase magazine-product-row magazine-product-row--start" aria-label="Sound Wave product">
+  <div class="soundwave-showcase-inner magazine-showcase-inner">
+    <div class="shop-showcase-card magazine-product-block">
+      <a class="soundwave-banner-link" href="{{ url_for('product_detail', slug='sound-wave') }}">
+        <img
+          class="soundwave-banner-img"
+          src="{{ url_for('static', filename='sound-wave-feature-01.png') }}"
+          alt="Sound Wave — sculptural clear acrylic vinyl display in a wave formation"
+          width="1600"
+          height="900"
+        >
+      </a>
+      <div class="soundwave-below magazine-product-info">
+        <h2 class="soundwave-title">Sound Wave</h2>
+        <p class="soundwave-price"><span data-nzd-cents="{{ sound_wave_product.price_cents }}">{{ format_money(sound_wave_product.price_cents) }}</span></p>
+        {% if sound_wave_product.add_to_cart_enabled|default(1) %}
+        <form method="post" action="{{ url_for('cart_add') }}" class="soundwave-add-form js-shop-add-cart">
+          <input type="hidden" name="product_id" value="{{ sound_wave_product.id }}">
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit" class="soundwave-add-btn">
+            <span class="soundwave-add-btn-text">
+              <span class="soundwave-add-line">Add to</span>
+              <span class="soundwave-add-line">cart</span>
+            </span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
     </div>
   </div>
 </section>
 {% endif %}
 
-<div id="lux-catalog" class="lux-editorial lux-sequence">
-  {% include '_luxury_editorial_products.html' %}
-</div>
+{% if sound_wave_product or riff_product %}
+{% include '_link_series_banner.html' %}
+{% endif %}
 
-<section class="lux-brand lux-brand--installation" aria-label="Listening as installation">
-  <div class="lux-brand__bg" aria-hidden="true"></div>
-  <span class="lux-brand__watermark" aria-hidden="true">Listen</span>
-  <div class="lux-brand__inner">
-    <div data-lux-reveal>
-      <p class="lux-brand__kicker">Space</p>
-      <h2 class="lux-brand__headline">A room is a speaker cabinet for your life.</h2>
+{% if riff_product %}
+<section class="riff-showcase magazine-product-row magazine-product-row--end magazine-product-row--stagger" aria-label="Riff product">
+  <div class="riff-showcase-inner magazine-showcase-inner">
+    <div class="riff-column shop-showcase-card magazine-product-block">
+      <div class="riff-visual">
+        <a class="riff-banner-link" href="{{ url_for('product_detail', slug='riff') }}">
+          <img
+            class="riff-banner-img"
+            src="{{ url_for('static', filename='riff-feature-01.png') }}"
+            alt="Riff — compact clear acrylic vinyl display with turntable in a minimalist room"
+            width="800"
+            height="1200"
+          >
+        </a>
+      </div>
+      <div class="riff-below magazine-product-info">
+        <h2 class="riff-title">Riff</h2>
+        <p class="riff-price">{{ format_money(riff_product.price_cents) }}</p>
+        {% if riff_product.add_to_cart_enabled|default(1) %}
+        <form method="post" action="{{ url_for('cart_add') }}" class="riff-add-form js-shop-add-cart">
+          <input type="hidden" name="product_id" value="{{ riff_product.id }}">
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit" class="riff-add-btn">
+            <span class="riff-add-btn-text">
+              <span class="riff-add-line">Add to</span>
+              <span class="riff-add-line">cart</span>
+            </span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
     </div>
-    <ul class="lux-brand__lines" data-lux-reveal>
-      <li>These pieces are designed to live beside serious listening — not as merch, but as infrastructure for mood.</li>
-      <li>Every surface is tuned for reflection, shadow, and the slow read of an album cover at arm&apos;s length.</li>
-      <li>Welcome to a microsite built like a showroom: same typography, same motion, your atmosphere.</li>
-    </ul>
   </div>
 </section>
+{% endif %}
 
-{% include '_luxury_more_products.html' %}
-
-<div class="lux-mobile-dock" aria-hidden="false">
-  <div class="lux-mobile-dock__inner">
-    <a href="#lux-catalog">Collection</a>
-    <a class="lux-mobile-dock__primary" href="{{ url_for('cart_view') }}">Cart</a>
+{% if harmony_product %}
+<section class="harmony-showcase magazine-product-row magazine-product-row--start" aria-label="Harmony product">
+  <div class="harmony-showcase-inner magazine-showcase-inner">
+    <div class="harmony-column shop-showcase-card magazine-product-block">
+      <div class="harmony-visual">
+        <a class="harmony-banner-link" href="{{ url_for('product_detail', slug='harmony') }}">
+          <img
+            class="harmony-banner-img"
+            src="{{ url_for('static', filename='harmony-feature-01.png') }}"
+            alt="Harmony — clear acrylic vinyl display with turntable in a minimalist room"
+            width="800"
+            height="1200"
+          >
+        </a>
+      </div>
+      <div class="harmony-below magazine-product-info">
+        <h2 class="harmony-title">Harmony</h2>
+        <p class="harmony-price"><span data-nzd-cents="{{ harmony_product.price_cents }}">{{ format_money(harmony_product.price_cents) }}</span></p>
+        {% if harmony_product.add_to_cart_enabled|default(1) %}
+        <form method="post" action="{{ url_for('cart_add') }}" class="harmony-add-form js-shop-add-cart">
+          <input type="hidden" name="product_id" value="{{ harmony_product.id }}">
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit" class="harmony-add-btn">
+            <span class="harmony-add-btn-text">
+              <span class="harmony-add-line">Add to</span>
+              <span class="harmony-add-line">cart</span>
+            </span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
   </div>
-</div>
+</section>
+{% endif %}
+
+{% if melody_product %}
+<section class="melody-showcase magazine-product-row magazine-product-row--end magazine-product-row--stagger" aria-label="Melody product">
+  <div class="melody-showcase-inner magazine-showcase-inner">
+    <div class="melody-column shop-showcase-card magazine-product-block">
+      <div class="melody-visual">
+        <a class="melody-banner-link" href="{{ url_for('product_detail', slug='melody') }}">
+          <img
+            class="melody-banner-img"
+            src="{{ url_for('static', filename='melody-feature-01.png') }}"
+            alt="Melody — clear acrylic vinyl display with turntable in a minimalist room"
+            width="1200"
+            height="800"
+          >
+        </a>
+      </div>
+      <div class="melody-below magazine-product-info">
+        <h2 class="melody-title">Melody</h2>
+        <p class="melody-price"><span data-nzd-cents="{{ melody_product.price_cents }}">{{ format_money(melody_product.price_cents) }}</span></p>
+        {% if melody_product.add_to_cart_enabled|default(1) %}
+        <form method="post" action="{{ url_for('cart_add') }}" class="melody-add-form js-shop-add-cart">
+          <input type="hidden" name="product_id" value="{{ melody_product.id }}">
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit" class="melody-add-btn">
+            <span class="melody-add-btn-text">
+              <span class="melody-add-line">Add to</span>
+              <span class="melody-add-line">cart</span>
+            </span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if allegro_product %}
+<section class="allegro-showcase magazine-product-row magazine-product-row--start" aria-label="Allegra product">
+  <div class="allegro-showcase-inner magazine-showcase-inner">
+    <div class="allegro-column shop-showcase-card magazine-product-block">
+      <div class="allegro-visual">
+        <a class="allegro-banner-link" href="{{ url_for('product_detail', slug='allegro') }}">
+          <img
+            class="allegro-banner-img"
+            src="{{ url_for('static', filename='allegra-feature-01.png') }}"
+            alt="Allegra — clear acrylic vinyl display with turntable in a minimalist room"
+            width="800"
+            height="1200"
+          >
+        </a>
+      </div>
+      <div class="allegro-below magazine-product-info">
+        <h2 class="allegro-title">Allegra</h2>
+        <p class="allegro-price"><span data-nzd-cents="{{ allegro_product.price_cents }}">{{ format_money(allegro_product.price_cents) }}</span></p>
+        {% if allegro_product.add_to_cart_enabled|default(1) %}
+        <form method="post" action="{{ url_for('cart_add') }}" class="allegro-add-form js-shop-add-cart">
+          <input type="hidden" name="product_id" value="{{ allegro_product.id }}">
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit" class="allegro-add-btn">
+            <span class="allegro-add-btn-text">
+              <span class="allegro-add-line">Add to</span>
+              <span class="allegro-add-line">cart</span>
+            </span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<div class="product-grid">
+  {% for p in products %}
+  {% if p.slug != 'sound-wave' and p.slug != 'riff' and p.slug != 'harmony' and p.slug != 'melody' and p.slug != 'allegro' %}
+  <article class="product-card {% if p.is_main %}product-main{% endif %}">
+    {% if p.is_main %}<span class="badge">Main</span>{% endif %}
+    <h2><a class="product-card-title-link" href="{{ url_for('product_detail', slug=p.slug) }}">{{ p.name }}</a></h2>
+    <p class="price"><span data-nzd-cents="{{ p.price_cents }}">{{ format_money(p.price_cents) }}</span></p>
+    {% set _desc = p.description or '' %}
+    <p class="desc">{{ _desc.split('\n\n')[0] if '\n\n' in _desc else _desc }}</p>
+    {% if p.add_to_cart_enabled|default(1) %}
+    <form method="post" action="{{ url_for('cart_add') }}" class="inline-form js-shop-add-cart">
+      <input type="hidden" name="product_id" value="{{ p.id }}">
+      <label class="sr-only" for="qty-{{ p.id }}">Quantity</label>
+      <input id="qty-{{ p.id }}" type="number" name="quantity" value="1" min="1" class="qty">
+      <button type="submit" class="btn primary">Add to cart</button>
+    </form>
+    {% endif %}
+  </article>
+  {% endif %}
+  {% endfor %}
 </div>
 {% endblock %}

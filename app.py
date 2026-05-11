@@ -1275,13 +1275,6 @@ def affiliate_landing(slug: str):
         products = database.list_products(conn)
         aff_id = int(aff["id"])
 
-    sound_wave_product = next((p for p in products if p["slug"] == "sound-wave"), None)
-    riff_product = next((p for p in products if p["slug"] == "riff"), None)
-    harmony_product = next((p for p in products if p["slug"] == "harmony"), None)
-    melody_product = next((p for p in products if p["slug"] == "melody"), None)
-    allegro_product = next((p for p in products if p["slug"] == "allegro"), None)
-    listening_room_banner_url = _listening_room_banner_url(page)
-
     vid = request.cookies.get("licorice_visitor")
     set_visitor_cookie = False
     if not vid:
@@ -1294,12 +1287,6 @@ def affiliate_landing(slug: str):
         page=page,
         products=products,
         format_money=database.format_money,
-        listening_room_banner_url=listening_room_banner_url,
-        sound_wave_product=sound_wave_product,
-        riff_product=riff_product,
-        harmony_product=harmony_product,
-        melody_product=melody_product,
-        allegro_product=allegro_product,
     )
     r = make_response(body)
     r.set_cookie(

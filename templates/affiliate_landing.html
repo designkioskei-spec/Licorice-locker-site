@@ -1,85 +1,51 @@
 {% extends "base.html" %}
 {% block title %}{{ page.headline }} — Licorice Locker{% endblock %}
-{% block body_class %}page-shop affiliate-landing luxury-xp listening-room-xp{% if page.banner_image_url and page.banner_image_url.strip() %} listening-room--has-banner{% endif %}{% endblock %}
-{% block head %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.css" crossorigin="anonymous">
-<link rel="stylesheet" href="{{ url_for('static', filename='luxury-experience.css') }}">
-{% endblock %}
+{% block body_class %}affiliate-landing{% endblock %}
 {% block content %}
-{% set lr_h = (affiliate.id * 47) % 360 %}
-<div class="lux-ambient-root" style="--lr-mood-h: {{ lr_h }};">
-<section class="lux-lr-hero" aria-label="Listening Room">
-  <div class="lux-lr-hero__media" aria-hidden="true">
-    <img src="{{ listening_room_banner_url }}" alt="" width="1920" height="1080" fetchpriority="high" decoding="async">
-  </div>
-  <div class="lux-lr-hero__scrim" aria-hidden="true"></div>
-  <div class="lux-lr-hero__grain" aria-hidden="true"></div>
-  <div class="lux-lr-hero__content">
-    <p class="lux-lr-hero__label" data-lux-reveal>The Listening Room</p>
-    {% set hparts = page.headline.split(' ', 1) %}
-    <h1 class="lux-lr-hero__title lux-lr-hero__title--split" aria-label="{{ page.headline }}">
-      {% if hparts|length > 1 %}
-      <span class="lux-lr-hero__title-line">{{ hparts[0] }}</span>
-      <span class="lux-lr-hero__title-line lux-hero__title-line--ghost">{{ hparts[1] }}</span>
-      {% else %}
-      <span class="lux-lr-hero__title-line">{{ page.headline }}</span>
-      {% endif %}
-    </h1>
-    {% if page.tagline %}
-    <p class="lux-lr-hero__tagline" data-lux-reveal>{{ page.tagline }}</p>
-    {% endif %}
-    {% if page.instagram_url or page.tiktok_url %}
-    <div class="lux-lr-hero__social" data-lux-reveal>
-      {% if page.instagram_url %}<a href="{{ page.instagram_url }}" target="_blank" rel="noopener noreferrer">Instagram</a>{% endif %}
-      {% if page.tiktok_url %}<a href="{{ page.tiktok_url }}" target="_blank" rel="noopener noreferrer">TikTok</a>{% endif %}
-    </div>
-    {% endif %}
-  </div>
-</section>
-
-{% if page.description %}
-<section class="lux-voice lux-voice--lr" aria-label="About this Listening Room">
-  <div class="lux-voice__grid">
-    <p class="lux-voice__anchor" data-lux-reveal>Room</p>
-    <div class="lux-voice__body">
-      <p class="lux-voice__text" data-lux-reveal>{{ page.description }}</p>
+<div class="aff-banner" {% if page.banner_image_url %}style="background-image: linear-gradient(120deg, rgba(37,24,29,0.88), rgba(37,24,29,0.45)), url('{{ affiliate_media_src(page.banner_image_url) }}');"{% endif %}>
+  <div class="aff-banner-inner">
+    <p class="eyebrow">The Listening Room</p>
+    <h1>{{ page.headline }}</h1>
+    <p class="tagline">{{ page.tagline }}</p>
+    <div class="social-links">
+      {% if page.instagram_url %}<a href="{{ page.instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}
+      {% if page.tiktok_url %}<a href="{{ page.tiktok_url }}" target="_blank" rel="noopener">TikTok</a>{% endif %}
     </div>
   </div>
-</section>
-{% endif %}
-
-<div id="lux-catalog" class="lux-editorial lux-sequence">
-  {% include '_luxury_editorial_products.html' %}
 </div>
 
-<section class="lux-brand lux-brand--installation" aria-label="Listening as installation">
-  <div class="lux-brand__bg" aria-hidden="true"></div>
-  <span class="lux-brand__watermark" aria-hidden="true">Show</span>
-  <div class="lux-brand__inner">
-    <div data-lux-reveal>
-      <p class="lux-brand__kicker">Showroom</p>
-      <h2 class="lux-brand__headline">The same design language. Your imagery. Your mood.</h2>
-    </div>
-    <ul class="lux-brand__lines" data-lux-reveal>
-      <li>Catalog, pricing, and craft are fixed — the story is yours.</li>
-      <li>Built like a luxury startup microsite: editorial pacing, cinematic motion, restraint.</li>
-      <li>Purchases from this link credit this Listening Room. Thank you for listening.</li>
-    </ul>
-  </div>
+<section class="panel">
+  <p class="lede">{{ page.description }}</p>
+  <p class="muted small">A tracking cookie was set so purchases from this device credit this member&apos;s Listening Room.</p>
 </section>
 
-{% include '_luxury_more_products.html' %}
+{% include '_link_series_banner.html' %}
 
-<p class="lux-aff-note" data-lux-reveal>A tracking cookie was set so purchases from this device credit this member&apos;s Listening Room.</p>
+<section class="hero">
+  <h2>Products</h2>
+  <p class="muted">Catalog is fixed — members cannot change names, prices, or features.</p>
+</section>
 
-<div class="lux-mobile-dock" aria-hidden="false">
-  <div class="lux-mobile-dock__inner">
-    <a href="#lux-catalog">Collection</a>
-    <a class="lux-mobile-dock__primary" href="{{ url_for('cart_view') }}">Cart</a>
-  </div>
+<div class="product-grid">
+  {% for p in products %}
+  <article class="product-card {% if p.is_main %}product-main{% endif %}">
+    {% if p.is_main %}<span class="badge">Main — Sound Wave</span>{% endif %}
+    <h3><a class="product-card-title-link" href="{{ url_for('product_detail', slug=p.slug) }}">{{ p.name }}</a></h3>
+    <p class="price"><span data-nzd-cents="{{ p.price_cents }}">{{ format_money(p.price_cents) }}</span></p>
+    {% set _desc = p.description or '' %}
+    <p class="desc">{{ _desc.split('\n\n')[0] if '\n\n' in _desc else _desc }}</p>
+    {% if p.add_to_cart_enabled|default(1) %}
+    <form method="post" action="{{ url_for('cart_add') }}" class="inline-form">
+      <input type="hidden" name="product_id" value="{{ p.id }}">
+      <input type="hidden" name="quantity" value="1">
+      <button type="submit" class="btn primary">Add to cart</button>
+    </form>
+    {% endif %}
+  </article>
+  {% endfor %}
 </div>
+
+<div class="panel actions-row">
+  <a class="btn primary" href="{{ url_for('cart_view') }}">View cart</a>
 </div>
 {% endblock %}
