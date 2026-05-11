@@ -15,6 +15,18 @@
     ".page-shop .melody-banner-img",
     ".page-shop .allegro-banner-img",
     ".page-shop .link-series-promo-img",
+    ".page-listening-room .soundwave-banner-img",
+    ".page-listening-room .riff-banner-img",
+    ".page-listening-room .harmony-banner-img",
+    ".page-listening-room .melody-banner-img",
+    ".page-listening-room .allegro-banner-img",
+    ".page-listening-room .link-series-promo-img",
+    ".affiliate-landing .soundwave-banner-img",
+    ".affiliate-landing .riff-banner-img",
+    ".affiliate-landing .harmony-banner-img",
+    ".affiliate-landing .melody-banner-img",
+    ".affiliate-landing .allegro-banner-img",
+    ".affiliate-landing .link-series-promo-img",
   ].join(",");
 
   var LERP = 0.13;
@@ -22,9 +34,18 @@
   var OUT_PAD = 120;
 
   function maxShiftPx() {
-    /* Prior caps 25.2 / 36.4px → ×1.7 (+70%); mobile still 50% of base */
-    var base = document.body.classList.contains("page-listening-room") ? 61.88 : 42.84;
+    var luxury = document.body.classList.contains("luxury-xp");
+    /* Tight caps on luxury layer; calm on mobile (no parallax). */
+    if (luxury && window.matchMedia("(max-width: 768px)").matches) {
+      return 0;
+    }
+    var base =
+      document.body.classList.contains("page-listening-room") ||
+      document.body.classList.contains("affiliate-landing")
+        ? 61.88
+        : 42.84;
     if (window.matchMedia("(max-width: 768px)").matches) base *= 0.5;
+    if (luxury) base *= 0.18;
     return base;
   }
 

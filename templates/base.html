@@ -638,8 +638,14 @@
     </div>
   </div>
   <script src="{{ url_for('static', filename='cart-upsell.js') }}" defer></script>
-  {% if request.endpoint in ('shop', 'listening_room') %}
+  {% if request.endpoint in ('shop', 'listening_room', 'affiliate_landing') %}
+  <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js" crossorigin="anonymous" defer></script>
+  {% endif %}
+  {% if request.endpoint in ('shop', 'listening_room', 'affiliate_landing') %}
   <script src="{{ url_for('static', filename='product-parallax.js') }}" defer></script>
+  {% endif %}
+  {% if request.endpoint in ('shop', 'listening_room', 'affiliate_landing') %}
+  <script src="{{ url_for('static', filename='luxury-experience.js') }}" defer></script>
   {% endif %}
   {% if not user_is_effective_admin() %}
   <script src="{{ url_for('static', filename='currency-display.js') }}" defer></script>
