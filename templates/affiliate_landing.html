@@ -2,7 +2,7 @@
 {% block title %}{{ page.headline }} — Licorice Locker{% endblock %}
 {% block body_class %}affiliate-landing{% endblock %}
 {% block content %}
-<div class="aff-banner" data-ll-reveal="up" {% if page.banner_image_url %}style="background-image: linear-gradient(120deg, rgba(37,24,29,0.88), rgba(37,24,29,0.45)), url('{{ affiliate_media_src(page.banner_image_url) }}');"{% endif %}>
+<div class="aff-banner" {% if page.banner_image_url %}style="background-image: linear-gradient(120deg, rgba(37,24,29,0.88), rgba(37,24,29,0.45)), url('{{ affiliate_media_src(page.banner_image_url) }}');"{% endif %}>
   <div class="aff-banner-inner">
     <p class="eyebrow">The Listening Room</p>
     <h1>{{ page.headline }}</h1>
@@ -14,9 +14,20 @@
   </div>
 </div>
 
-<section class="panel" data-ll-reveal="up" data-ll-reveal-delay="24">
-  <p class="lede">{{ page.description }}</p>
-  <p class="muted small">A tracking cookie was set so purchases from this device credit this member&apos;s Listening Room.</p>
+<section class="panel affiliate-intro" aria-label="About this Listening Room">
+  {% set desc = (page.description or '')|trim %}
+  {% if '\n\n' in desc %}
+    {% set parts = desc.split('\n\n', 1) %}
+    <p class="affiliate-intro-head">{{ parts[0]|trim }}</p>
+    <p class="affiliate-intro-sub">{{ parts[1]|trim }}</p>
+  {% elif '\n' in desc %}
+    {% set parts = desc.split('\n', 1) %}
+    <p class="affiliate-intro-head">{{ parts[0]|trim }}</p>
+    <p class="affiliate-intro-sub">{{ parts[1]|trim }}</p>
+  {% else %}
+    <p class="affiliate-intro-head">{{ desc }}</p>
+  {% endif %}
+  <p class="affiliate-intro-note muted small">A tracking cookie was set so purchases from this device credit this member&apos;s Listening Room.</p>
 </section>
 
 {% include '_link_series_banner.html' %}
