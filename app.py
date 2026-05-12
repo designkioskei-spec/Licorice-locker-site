@@ -586,6 +586,9 @@ class User(UserMixin):
         else:
             self.terms_accepted = 1 if self.terms_accepted_at else 0
         self.affiliate_active = int(row["affiliate_active"]) if "affiliate_active" in row.keys() else 1
+        self.affiliate_country = (
+            (row["affiliate_country"] or "").strip() if "affiliate_country" in row.keys() else ""
+        )
 
 
 @login_manager.user_loader
@@ -1169,10 +1172,17 @@ def auth_affiliate_step2():
     totp = pyotp.TOTP(secret)
     if not totp.verify(code, valid_window=1):
         return jsonify({"ok": False, "error": "invalid_code"}), 400
-    with database.get_db() as conn:
-        if mode == "setup":
-            database.confirm_user_totp(conn, uid)
-        row = database.user_by_id(conn, uid)
+    try:
+        with database.get_db() as conn:
+            if mode == "setup":
+                database.confirm_user_totp(conn, uid)
+                chk = conn.execute("SELECT totp_confirmed FROM users WHERE id = ?", (uid,)).fetchone()
+                if not chk or int(chk["totp_confirmed"] or 0) != 1:
+                    raise database.PersistVerificationError("totp_confirm_not_persisted")
+            row = database.user_by_id(conn, uid)
+    except database.PersistVerificationError:
+        logger.error("auth_affiliate_step2 totp persist verification failed user_id=%s", uid)
+        return jsonify({"ok": False, "error": "persist_failed"}), 500
     if not row:
         _clear_affiliate_2fa_session()
         return jsonify({"ok": False, "error": "invalid"}), 400
@@ -2667,6 +2677,7 @@ def affiliate_dashboard():
         affiliate_pending_payout = database.affiliate_has_pending_commission_payout(
             conn, current_user.id
         )
+        fellow_affiliates = database.list_fellow_affiliates_for_dashboard(conn, current_user.id)
     return render_template(
         "affiliate_dashboard.html",
         affiliate_nav_active="dashboard",
@@ -2675,6 +2686,7 @@ def affiliate_dashboard():
         creative_assets=creative_assets,
         earnings_display=EARNINGS_DISPLAY_NZD,
         affiliate_pending_payout=affiliate_pending_payout,
+        fellow_affiliates=fellow_affiliates,
     )
 
 
@@ -2721,22 +2733,52 @@ def affiliate_terms_action():
     action = (request.form.get("action") or "").strip()
     wants_json = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     uid = current_user.id
+
+    def _terms_persist_failed_response():
+        if wants_json:
+            return jsonify({"ok": False, "error": "persist_failed"}), 500
+        flash("We could not record your choice. Please try again.", "error")
+        return redirect(request.referrer or url_for("affiliate_dashboard"))
+
     if action == "accept":
-        with database.get_db() as conn:
-            conn.execute(
-                "UPDATE users SET terms_accepted = 1, terms_accepted_at = ? WHERE id = ?",
-                (_now_utc().isoformat(), uid),
-            )
+        try:
+            with database.get_db() as conn:
+                ts = _now_utc().isoformat()
+                conn.execute(
+                    "UPDATE users SET terms_accepted = 1, terms_accepted_at = ? WHERE id = ?",
+                    (ts, uid),
+                )
+                chk = conn.execute(
+                    "SELECT terms_accepted, terms_accepted_at FROM users WHERE id = ?",
+                    (uid,),
+                ).fetchone()
+                if not chk or int(chk["terms_accepted"] or 0) != 1 or not (chk["terms_accepted_at"] or "").strip():
+                    raise database.PersistVerificationError("terms_accept_not_persisted")
+        except database.PersistVerificationError:
+            logger.error("affiliate_terms_action accept verification failed user_id=%s", uid)
+            return _terms_persist_failed_response()
         if wants_json:
             return jsonify({"ok": True, "terms_accepted": True})
         flash("Terms accepted. Your Listening Room tools are now active.", "ok")
         return redirect(request.referrer or url_for("affiliate_dashboard"))
     if action == "decline":
-        with database.get_db() as conn:
-            conn.execute(
-                "UPDATE users SET terms_accepted = 0, terms_accepted_at = NULL WHERE id = ?",
-                (uid,),
-            )
+        try:
+            with database.get_db() as conn:
+                conn.execute(
+                    "UPDATE users SET terms_accepted = 0, terms_accepted_at = NULL WHERE id = ?",
+                    (uid,),
+                )
+                chk = conn.execute(
+                    "SELECT terms_accepted, terms_accepted_at FROM users WHERE id = ?",
+                    (uid,),
+                ).fetchone()
+                if not chk or int(chk["terms_accepted"] or 0) != 0:
+                    raise database.PersistVerificationError("terms_decline_not_persisted")
+                if (chk["terms_accepted_at"] or "").strip():
+                    raise database.PersistVerificationError("terms_decline_at_not_null")
+        except database.PersistVerificationError:
+            logger.error("affiliate_terms_action decline verification failed user_id=%s", uid)
+            return _terms_persist_failed_response()
         if wants_json:
             return jsonify({"ok": True, "terms_accepted": False})
         flash("You declined the terms. Your Listening Room link and dashboard are locked until you agree.", "error")
@@ -2882,107 +2924,126 @@ def affiliate_page_edit():
     if current_user.role != "affiliate":
         return redirect(url_for("admin_dashboard"))
     uid = current_user.id
+
+    if request.method == "POST":
+        try:
+            with database.get_db() as conn:
+                tr = conn.execute(
+                    "SELECT terms_accepted, terms_accepted_at FROM users WHERE id = ?",
+                    (uid,),
+                ).fetchone()
+                terms_ok = (
+                    int(tr["terms_accepted"] or 0) == 1
+                    if tr and "terms_accepted" in tr.keys()
+                    else bool(tr["terms_accepted_at"] if tr else None)
+                )
+
+                if not terms_ok:
+                    flash("You must accept the terms before updating your page.", "error")
+                    return redirect(url_for("affiliate_page_edit"))
+
+                database.ensure_affiliate_page_for_user(conn, uid)
+
+                headline = request.form.get("headline", "").strip() or "Welcome"
+                tagline = request.form.get("tagline", "").strip()
+                description = request.form.get("description", "").strip()
+                instagram = request.form.get("instagram_url", "").strip()
+                tiktok = request.form.get("tiktok_url", "").strip()
+                affiliate_country = (request.form.get("affiliate_country") or "").strip()[:120]
+                uploaded = request.files.get("display_picture")
+                clear_photo = request.form.get("clear_display_picture") == "1"
+                prev_row = conn.execute(
+                    "SELECT display_picture_url FROM users WHERE id = ?", (uid,)
+                ).fetchone()
+                prev_pic = (prev_row["display_picture_url"] or "").strip() if prev_row else ""
+
+                prev_page_row = conn.execute(
+                    "SELECT banner_image_url FROM affiliate_pages WHERE user_id = ?", (uid,)
+                ).fetchone()
+                prev_banner = (prev_page_row["banner_image_url"] or "").strip() if prev_page_row else ""
+                clear_banner = request.form.get("clear_banner_image") == "1"
+                banner_upload = request.files.get("banner_image")
+                manual_banner_url = request.form.get("banner_image_url", "").strip()
+
+                if clear_banner:
+                    banner = ""
+                    _unlink_affiliate_banner_file(uid)
+                elif banner_upload and banner_upload.filename:
+                    try:
+                        banner = _save_affiliate_banner(uid, banner_upload)
+                    except ValueError as err:
+                        flash(str(err), "error")
+                        return redirect(url_for("affiliate_page_edit"))
+                elif manual_banner_url:
+                    banner = manual_banner_url
+                    if _affiliate_banner_is_uploaded_path(prev_banner):
+                        _unlink_affiliate_banner_file(uid)
+                else:
+                    banner = prev_banner
+
+                if clear_photo:
+                    avatar_path = AVATAR_UPLOAD_DIR / f"{uid}.jpg"
+                    if avatar_path.is_file():
+                        avatar_path.unlink()
+                    display_picture_url = None
+                elif uploaded and uploaded.filename:
+                    try:
+                        display_picture_url = _save_affiliate_display_picture(uid, uploaded)
+                    except ValueError as err:
+                        flash(str(err), "error")
+                        return redirect(url_for("affiliate_page_edit"))
+                else:
+                    url_in = request.form.get("display_picture_url", "").strip()
+                    if url_in:
+                        display_picture_url = url_in
+                    else:
+                        display_picture_url = prev_pic or None
+                target = 25  # Stored for compatibility; dashboard progress uses tier milestones (10 / 25).
+                now_iso = _now_utc().isoformat()
+                conn.execute(
+                    """
+                    UPDATE affiliate_pages SET
+                        headline = ?, tagline = ?, description = ?,
+                        instagram_url = ?, tiktok_url = ?, banner_image_url = ?,
+                        monthly_sales_target = ?, page_updated_at = ?
+                    WHERE user_id = ?
+                    """,
+                    (headline, tagline, description, instagram, tiktok, banner, target, now_iso, uid),
+                )
+                conn.execute(
+                    "UPDATE users SET display_picture_url = ?, affiliate_country = ? WHERE id = ?",
+                    (display_picture_url or None, affiliate_country, uid),
+                )
+                database.verify_affiliate_page_profile_saved(
+                    conn,
+                    uid,
+                    headline,
+                    tagline,
+                    description,
+                    instagram,
+                    tiktok,
+                    banner,
+                    affiliate_country,
+                    display_picture_url,
+                )
+        except database.PersistVerificationError as exc:
+            logger.error(
+                "affiliate_page_edit persist_verification_failed user_id=%s detail=%s",
+                uid,
+                exc,
+            )
+            flash(
+                "We could not confirm your page saved, so nothing was stored. Please try again.",
+                "error",
+            )
+            return redirect(url_for("affiliate_page_edit"))
+        flash("Your page was updated.", "ok")
+        return redirect(url_for("affiliate_page_edit"))
+
     with database.get_db() as conn:
         urow = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-
-        if request.method == "POST":
-            action = (request.form.get("action") or "update").strip()
-            tr = conn.execute(
-                "SELECT terms_accepted, terms_accepted_at FROM users WHERE id = ?",
-                (uid,),
-            ).fetchone()
-            terms_ok = (
-                int(tr["terms_accepted"] or 0) == 1
-                if tr and "terms_accepted" in tr.keys()
-                else bool(tr["terms_accepted_at"] if tr else None)
-            )
-
-            if not terms_ok:
-                flash("You must accept the terms before updating your page.", "error")
-                return redirect(url_for("affiliate_page_edit"))
-
-            headline = request.form.get("headline", "").strip() or "Welcome"
-            tagline = request.form.get("tagline", "").strip()
-            description = request.form.get("description", "").strip()
-            instagram = request.form.get("instagram_url", "").strip()
-            tiktok = request.form.get("tiktok_url", "").strip()
-            uploaded = request.files.get("display_picture")
-            clear_photo = request.form.get("clear_display_picture") == "1"
-            prev_row = conn.execute(
-                "SELECT display_picture_url FROM users WHERE id = ?", (uid,)
-            ).fetchone()
-            prev_pic = (prev_row["display_picture_url"] or "").strip() if prev_row else ""
-
-            prev_page_row = conn.execute(
-                "SELECT banner_image_url FROM affiliate_pages WHERE user_id = ?", (uid,)
-            ).fetchone()
-            prev_banner = (prev_page_row["banner_image_url"] or "").strip() if prev_page_row else ""
-            clear_banner = request.form.get("clear_banner_image") == "1"
-            banner_upload = request.files.get("banner_image")
-            manual_banner_url = request.form.get("banner_image_url", "").strip()
-
-            if clear_banner:
-                banner = ""
-                _unlink_affiliate_banner_file(uid)
-            elif banner_upload and banner_upload.filename:
-                try:
-                    banner = _save_affiliate_banner(uid, banner_upload)
-                except ValueError as err:
-                    flash(str(err), "error")
-                    return redirect(url_for("affiliate_page_edit"))
-            elif manual_banner_url:
-                banner = manual_banner_url
-                if _affiliate_banner_is_uploaded_path(prev_banner):
-                    _unlink_affiliate_banner_file(uid)
-            else:
-                banner = prev_banner
-
-            if clear_photo:
-                avatar_path = AVATAR_UPLOAD_DIR / f"{uid}.jpg"
-                if avatar_path.is_file():
-                    avatar_path.unlink()
-                display_picture_url = None
-            elif uploaded and uploaded.filename:
-                try:
-                    display_picture_url = _save_affiliate_display_picture(uid, uploaded)
-                except ValueError as err:
-                    flash(str(err), "error")
-                    return redirect(url_for("affiliate_page_edit"))
-            else:
-                url_in = request.form.get("display_picture_url", "").strip()
-                if url_in:
-                    display_picture_url = url_in
-                else:
-                    display_picture_url = prev_pic or None
-            target = 25  # Stored for compatibility; dashboard progress uses tier milestones (10 / 25).
-            now_iso = _now_utc().isoformat()
-            conn.execute(
-                """
-                UPDATE affiliate_pages SET
-                    headline = ?, tagline = ?, description = ?,
-                    instagram_url = ?, tiktok_url = ?, banner_image_url = ?,
-                    monthly_sales_target = ?, page_updated_at = ?
-                WHERE user_id = ?
-                """,
-                (headline, tagline, description, instagram, tiktok, banner, target, now_iso, uid),
-            )
-            conn.execute(
-                "UPDATE users SET display_picture_url = ? WHERE id = ?",
-                (display_picture_url or None, uid),
-            )
-            flash("Your page was updated.", "ok")
-            return redirect(url_for("affiliate_page_edit"))
-
+        database.ensure_affiliate_page_for_user(conn, uid)
         page = database.affiliate_page(conn, uid)
-        if not page:
-            conn.execute(
-                """
-                INSERT INTO affiliate_pages (user_id, headline, tagline, description, monthly_sales_target)
-                VALUES (?, 'Welcome', '', '', 25)
-                """,
-                (uid,),
-            )
-            page = database.affiliate_page(conn, uid)
         u_public = conn.execute(
             "SELECT affiliate_slug, affiliate_code FROM users WHERE id = ?", (uid,)
         ).fetchone()
@@ -2998,12 +3059,16 @@ def affiliate_page_edit():
     display_picture_url = ""
     if urow and "display_picture_url" in urow.keys() and urow["display_picture_url"]:
         display_picture_url = str(urow["display_picture_url"]).strip()
+    affiliate_country = ""
+    if urow and "affiliate_country" in urow.keys() and urow["affiliate_country"]:
+        affiliate_country = str(urow["affiliate_country"]).strip()[:120]
     return render_template(
         "affiliate_page_edit.html",
         affiliate_nav_active="page",
         page=page,
         public_url=public_url,
         display_picture_url=display_picture_url,
+        affiliate_country=affiliate_country,
     )
 
 

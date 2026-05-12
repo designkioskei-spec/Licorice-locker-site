@@ -29,6 +29,33 @@ def _resolved_db_path() -> Path:
 
 DB_PATH = _resolved_db_path()
 
+
+class PersistVerificationError(Exception):
+    """Read-back check failed after a write; raise inside ``get_db()`` so the transaction rolls back."""
+
+
+def _norm_text(val: Any) -> str:
+    return (val if val is not None else "").strip()
+
+
+def ensure_affiliate_page_for_user(db: sqlite3.Connection, user_id: int) -> None:
+    """Ensure ``affiliate_pages`` has a row for this member (repairs legacy gaps; safe if row exists)."""
+    uid = int(user_id)
+    if db.execute("SELECT 1 FROM affiliate_pages WHERE user_id = ?", (uid,)).fetchone():
+        return
+    try:
+        db.execute(
+            """
+            INSERT INTO affiliate_pages (user_id, headline, tagline, description, monthly_sales_target)
+            VALUES (?, 'Welcome', '', '', 25)
+            """,
+            (uid,),
+        )
+    except sqlite3.IntegrityError:
+        if db.execute("SELECT 1 FROM affiliate_pages WHERE user_id = ?", (uid,)).fetchone():
+            return
+        raise
+
 # Only these normalized emails may have role ``admin`` (enforced at bootstrap + login).
 ADMIN_EMAIL_ALLOWLIST: Tuple[str, ...] = (
     "joshuafrenchdesign@gmail.com",
@@ -196,6 +223,8 @@ def get_connection() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    # Enforced on every connection (init_db PRAGMA only applied to that one connection).
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -524,6 +553,8 @@ def _migrate_affiliate_profile_columns(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE users ADD COLUMN signup_first_name TEXT")
     if "signup_last_name" not in cols:
         db.execute("ALTER TABLE users ADD COLUMN signup_last_name TEXT")
+    if "affiliate_country" not in cols:
+        db.execute("ALTER TABLE users ADD COLUMN affiliate_country TEXT NOT NULL DEFAULT ''")
     db.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_users_affiliate_code
@@ -1424,6 +1455,84 @@ def affiliate_by_code(db: sqlite3.Connection, code: str) -> Optional[sqlite3.Row
 
 def affiliate_page(db: sqlite3.Connection, user_id: int) -> Optional[sqlite3.Row]:
     return db.execute("SELECT * FROM affiliate_pages WHERE user_id = ?", (user_id,)).fetchone()
+
+
+def verify_affiliate_page_profile_saved(
+    db: sqlite3.Connection,
+    user_id: int,
+    headline: str,
+    tagline: str,
+    description: str,
+    instagram_url: str,
+    tiktok_url: str,
+    banner_image_url: str,
+    affiliate_country: str,
+    display_picture_url: Optional[str],
+) -> None:
+    """Confirm landing-page + profile fields match what we just wrote; raises PersistVerificationError if not."""
+    uid = int(user_id)
+    ap = db.execute(
+        """
+        SELECT headline, tagline, description, instagram_url, tiktok_url, banner_image_url
+        FROM affiliate_pages WHERE user_id = ?
+        """,
+        (uid,),
+    ).fetchone()
+    ur = db.execute(
+        "SELECT display_picture_url, affiliate_country FROM users WHERE id = ?",
+        (uid,),
+    ).fetchone()
+    if not ap or not ur:
+        raise PersistVerificationError("missing_row")
+    if _norm_text(ap["headline"]) != _norm_text(headline):
+        raise PersistVerificationError("headline")
+    if _norm_text(ap["tagline"]) != _norm_text(tagline):
+        raise PersistVerificationError("tagline")
+    if _norm_text(ap["description"]) != _norm_text(description):
+        raise PersistVerificationError("description")
+    if _norm_text(ap["instagram_url"]) != _norm_text(instagram_url):
+        raise PersistVerificationError("instagram_url")
+    if _norm_text(ap["tiktok_url"]) != _norm_text(tiktok_url):
+        raise PersistVerificationError("tiktok_url")
+    if _norm_text(ap["banner_image_url"]) != _norm_text(banner_image_url):
+        raise PersistVerificationError("banner_image_url")
+    if _norm_text(ur["affiliate_country"]) != _norm_text(affiliate_country):
+        raise PersistVerificationError("affiliate_country")
+    stored_dp = ur["display_picture_url"]
+    want = ((display_picture_url or "").strip() or None)
+    got = ((stored_dp or "").strip() or None)
+    if want != got:
+        raise PersistVerificationError("display_picture_url")
+
+
+def list_fellow_affiliates_for_dashboard(db: sqlite3.Connection, exclude_user_id: int) -> List[sqlite3.Row]:
+    """Other Listening Room members (terms accepted, active) for community / collab directory."""
+    return db.execute(
+        """
+        SELECT
+            u.id,
+            u.email,
+            u.full_name,
+            u.affiliate_slug,
+            u.affiliate_code,
+            COALESCE(NULLIF(TRIM(u.affiliate_country), ''), '') AS affiliate_country,
+            u.display_picture_url,
+            ap.instagram_url,
+            ap.tiktok_url
+        FROM users u
+        INNER JOIN affiliate_pages ap ON ap.user_id = u.id
+        WHERE u.role = 'affiliate'
+          AND u.id != ?
+          AND COALESCE(u.affiliate_active, 1) = 1
+          AND (
+                COALESCE(u.terms_accepted, 0) = 1
+             OR (u.terms_accepted_at IS NOT NULL AND TRIM(COALESCE(u.terms_accepted_at, '')) != '')
+          )
+        ORDER BY
+            LOWER(COALESCE(NULLIF(TRIM(u.full_name), ''), u.affiliate_slug, u.email))
+        """,
+        (int(exclude_user_id),),
+    ).fetchall()
 
 
 def affiliate_lifetime_order_count(db: sqlite3.Connection, affiliate_user_id: int) -> int:

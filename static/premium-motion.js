@@ -204,7 +204,6 @@
     document.querySelectorAll(".top-banner-tagline").forEach(splitWords);
     document.querySelectorAll(".link-series-promo-title").forEach(splitWords);
     document.querySelectorAll(".aff-banner h1").forEach(splitWords);
-    document.querySelectorAll(".aff-banner .tagline").forEach(splitWords);
     document.querySelectorAll(".shop-intro-text").forEach(splitSentences);
   }
 

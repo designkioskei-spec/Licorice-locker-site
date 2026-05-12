@@ -2,33 +2,42 @@
 {% block title %}{{ page.headline }} — Licorice Locker{% endblock %}
 {% block body_class %}affiliate-landing{% endblock %}
 {% block content %}
-<div class="aff-banner" {% if page.banner_image_url %}style="background-image: linear-gradient(120deg, rgba(37,24,29,0.88), rgba(37,24,29,0.45)), url('{{ affiliate_media_src(page.banner_image_url) }}');"{% endif %}>
-  <div class="aff-banner-inner">
-    <p class="eyebrow">The Listening Room</p>
-    <h1>{{ page.headline }}</h1>
-    <p class="tagline">{{ page.tagline }}</p>
-    <div class="social-links">
+<div class="aff-landing-hero-stack">
+  <div class="aff-banner" {% if page.banner_image_url %}style="background-image: linear-gradient(120deg, rgba(37,24,29,0.88), rgba(37,24,29,0.45)), url('{{ affiliate_media_src(page.banner_image_url) }}');"{% endif %}>
+    <div class="aff-banner-inner">
+      <p class="eyebrow">The Listening Room</p>
+      <h1>{{ page.headline }}</h1>
+    </div>
+  </div>
+  <div class="aff-landing-below-banner">
+    {% if page.tagline %}
+    <p class="aff-landing-subtitle">{{ page.tagline }}</p>
+    {% endif %}
+    {% if page.instagram_url or page.tiktok_url %}
+    <div class="aff-landing-social social-links">
       {% if page.instagram_url %}<a href="{{ page.instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}
       {% if page.tiktok_url %}<a href="{{ page.tiktok_url }}" target="_blank" rel="noopener">TikTok</a>{% endif %}
     </div>
+    {% endif %}
+    {% set desc = (page.description or '')|trim %}
+    {% if desc %}
+    <div class="aff-landing-bio">
+      {% if '\n\n' in desc %}
+        {% set parts = desc.split('\n\n', 1) %}
+        <p class="aff-landing-bio-lead">{{ parts[0]|trim }}</p>
+        <p class="aff-landing-bio-body">{{ parts[1]|trim }}</p>
+      {% elif '\n' in desc %}
+        {% set parts = desc.split('\n', 1) %}
+        <p class="aff-landing-bio-lead">{{ parts[0]|trim }}</p>
+        <p class="aff-landing-bio-body">{{ parts[1]|trim }}</p>
+      {% else %}
+        <p class="aff-landing-bio-lead">{{ desc }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+    <p class="aff-landing-cookie-note muted small">A tracking cookie was set so purchases from this device credit this member&apos;s Listening Room.</p>
   </div>
 </div>
-
-<section class="panel affiliate-intro" aria-label="About this Listening Room">
-  {% set desc = (page.description or '')|trim %}
-  {% if '\n\n' in desc %}
-    {% set parts = desc.split('\n\n', 1) %}
-    <p class="affiliate-intro-head">{{ parts[0]|trim }}</p>
-    <p class="affiliate-intro-sub">{{ parts[1]|trim }}</p>
-  {% elif '\n' in desc %}
-    {% set parts = desc.split('\n', 1) %}
-    <p class="affiliate-intro-head">{{ parts[0]|trim }}</p>
-    <p class="affiliate-intro-sub">{{ parts[1]|trim }}</p>
-  {% else %}
-    <p class="affiliate-intro-head">{{ desc }}</p>
-  {% endif %}
-  <p class="affiliate-intro-note muted small">A tracking cookie was set so purchases from this device credit this member&apos;s Listening Room.</p>
-</section>
 
 {% include '_link_series_banner.html' %}
 

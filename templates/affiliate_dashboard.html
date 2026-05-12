@@ -25,6 +25,103 @@
   </div>
 </section>
 
+<section class="panel fellow-affiliates-panel fellow-listening-rooms-panel" id="fellow-listening-rooms">
+  <h2>Fellow Listening Rooms</h2>
+  <p class="fellow-affiliates-lede">
+    Build the community: find other members, reach out to collaborate or cross-promote, and grow together.
+    Search by name, country, email, or code. Your email app opens with a ready-to-send draft when you use
+    <strong>Collab with…</strong> or tap their email.
+  </p>
+  {% if fellow_affiliates %}
+  <div class="fellow-affiliates-search-wrap">
+    <label class="fellow-affiliates-search-label sr-only" for="fellow-affiliates-search">Search members</label>
+    <input
+      type="search"
+      id="fellow-affiliates-search"
+      class="fellow-affiliates-search"
+      placeholder="Search by name, country, email, or Listening Room link…"
+      autocomplete="off"
+      spellcheck="false"
+    >
+  </div>
+  <p class="fellow-affiliates-no-results muted" id="fellow-affiliates-no-results" hidden>No members match that search.</p>
+  <ul class="fellow-affiliates-list" id="fellow-affiliates-list">
+    {% for f in fellow_affiliates %}
+    {% set peer_name = (f.full_name or f.affiliate_slug or f.email or 'there')|trim %}
+    {% set peer_country = (f.affiliate_country or '')|trim %}
+    {% set peer_ig = (f.instagram_url or '')|trim %}
+    {% set peer_tt = (f.tiktok_url or '')|trim %}
+    {% set my_name = (current_user.full_name or current_user.affiliate_slug or 'A Listening Room member')|trim %}
+    {% set my_country = (current_user.affiliate_country or '')|trim %}
+    {% set my_code = (current_user.affiliate_code or '')|trim %}
+    {% if my_code %}
+      {% set my_lr = request.url_root.rstrip('/') ~ url_for('listening_room', code=my_code) %}
+    {% elif current_user.affiliate_slug %}
+      {% set my_lr = request.url_root.rstrip('/') ~ url_for('affiliate_landing', slug=current_user.affiliate_slug) %}
+    {% else %}
+      {% set my_lr = request.url_root.rstrip('/') ~ url_for('shop') %}
+    {% endif %}
+    {% set peer_code = (f.affiliate_code or '')|trim %}
+    {% if peer_code %}
+      {% set peer_lr = request.url_root.rstrip('/') ~ url_for('listening_room', code=peer_code) %}
+    {% elif f.affiliate_slug %}
+      {% set peer_lr = request.url_root.rstrip('/') ~ url_for('affiliate_landing', slug=f.affiliate_slug) %}
+    {% else %}
+      {% set peer_lr = '' %}
+    {% endif %}
+    {% set collab_lines = [
+      'Hi ' ~ peer_name ~ ',',
+      '',
+      'I\'m ' ~ my_name ~ ' from Licorice Locker\'s Listening Room. I\'d love to connect about a collaboration, cross-promotion, or just to say hello as fellow members.',
+      '',
+      'About me:',
+      '- Country / region: ' ~ (my_country if my_country else '—'),
+      '- My public Listening Room: ' ~ my_lr,
+      '',
+      'I saw your public page here: ' ~ (peer_lr if peer_lr else '—'),
+      '- Your country / region (from the directory): ' ~ (peer_country if peer_country else '—'),
+      '- Instagram (from the directory): ' ~ (peer_ig if peer_ig else '—'),
+      '- TikTok (from the directory): ' ~ (peer_tt if peer_tt else '—'),
+    ] %}
+    {% set _ = collab_lines.extend(['', 'Thanks,', my_name]) %}
+    {% set collab_body = collab_lines|join('\n') %}
+    {% set collab_subject = 'Listening Room collab — Licorice Locker' %}
+    {% set collab_href = 'mailto:' ~ (f.email|urlencode) ~ '?subject=' ~ (collab_subject|urlencode) ~ '&body=' ~ (collab_body|urlencode) %}
+    {% set peer_slug = (f.affiliate_slug or '')|trim %}
+    {% set peer_search_blob = (peer_name ~ ' ' ~ f.email ~ ' ' ~ peer_country ~ ' ' ~ peer_slug ~ ' ' ~ peer_code ~ ' ' ~ peer_ig ~ ' ' ~ peer_tt)|lower %}
+    <li class="fellow-affiliate-card" data-fellow-search="{{ peer_search_blob|e }}">
+      <div class="fellow-affiliate-card-main">
+        <span class="fellow-affiliate-avatar-wrap">
+          {% if f.display_picture_url %}
+          <img class="fellow-affiliate-avatar" src="{{ affiliate_media_src(f.display_picture_url) }}" alt="" width="56" height="56" loading="lazy" decoding="async">
+          {% else %}
+          <span class="fellow-affiliate-avatar-placeholder" aria-hidden="true">{{ (peer_name[:1] if peer_name else '?')|upper }}</span>
+          {% endif %}
+        </span>
+        <div class="fellow-affiliate-card-text">
+          <span class="fellow-affiliate-name">{{ peer_name }}</span>
+          <span class="fellow-affiliate-meta">
+            {% if peer_country %}<span class="fellow-affiliate-country">{{ peer_country }}</span>{% else %}<span class="muted">Country not listed</span>{% endif %}
+          </span>
+          <a class="fellow-affiliate-email" href="{{ collab_href }}">{{ f.email }}</a>
+          <span class="fellow-affiliate-socials">
+            {% if peer_ig %}<a href="{{ peer_ig }}" target="_blank" rel="noopener noreferrer">Instagram</a>{% endif %}
+            {% if peer_ig and peer_tt %}<span class="fellow-affiliate-social-sep" aria-hidden="true">·</span>{% endif %}
+            {% if peer_tt %}<a href="{{ peer_tt }}" target="_blank" rel="noopener noreferrer">TikTok</a>{% endif %}
+            {% if not peer_ig and not peer_tt %}<span class="muted small">No social links listed</span>{% endif %}
+          </span>
+        </div>
+      </div>
+      <a class="btn primary fellow-affiliate-collab" href="{{ collab_href }}">Collab with {{ peer_name }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">You&apos;re the only active Listening Room member right now, or others haven&apos;t accepted terms yet. Check back later as the community grows.</p>
+  {% endif %}
+  <p class="muted small fellow-affiliates-foot">Add your country and social links under <a href="{{ url_for('affiliate_page_edit') }}">Edit display photo &amp; landing page</a> so others can find you too.</p>
+</section>
+
 <section class="panel affiliate-resources">
   <h2>Resources</h2>
   <ul class="resource-list">
@@ -308,6 +405,31 @@
 
    refresh();
   setInterval(refresh, 15000);
+})();
+</script>
+<script>
+(function () {
+  var input = document.getElementById("fellow-affiliates-search");
+  var list = document.getElementById("fellow-affiliates-list");
+  if (!input || !list) return;
+  var items = list.querySelectorAll("[data-fellow-search]");
+  var emptyMsg = document.getElementById("fellow-affiliates-no-results");
+  function applyFilter() {
+    var q = (input.value || "").toLowerCase().replace(/\s+/g, " ").trim();
+    var n = 0;
+    for (var i = 0; i < items.length; i++) {
+      var li = items[i];
+      var hay = (li.getAttribute("data-fellow-search") || "").toLowerCase();
+      var ok = !q || hay.indexOf(q) !== -1;
+      li.hidden = !ok;
+      if (ok) n += 1;
+    }
+    if (emptyMsg) {
+      emptyMsg.hidden = !(q.length > 0 && n === 0);
+    }
+  }
+  input.addEventListener("input", applyFilter);
+  input.addEventListener("search", applyFilter);
 })();
 </script>
 {% endblock %}
