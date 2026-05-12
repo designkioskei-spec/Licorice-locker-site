@@ -1,4 +1,5 @@
 # Railway / Docker: no build-time secrets. Set STRIPE_SECRET_KEY, STRIPE_PUBLIC_KEY,
+# STRIPE_WEBHOOK_SECRET,
 # SITE_URL, etc. in Railway → Service → Variables (runtime only).
 FROM python:3.12-slim
 

@@ -152,7 +152,10 @@
     for (var i = 0; i < parts.length; i++) {
       var part = parts[i];
       if (/^\s+$/.test(part)) {
-        el.appendChild(document.createTextNode(part));
+        var space = document.createElement("span");
+        space.className = "ll-split-space";
+        space.textContent = part;
+        el.appendChild(space);
       } else if (part) {
         var span = document.createElement("span");
         span.className = "ll-split-word";

@@ -95,6 +95,21 @@ def _stripe_publishable_key() -> str:
     )
 
 
+def _stripe_webhook_secret() -> str:
+    return _env_secret_clean("STRIPE_WEBHOOK_SECRET")
+
+
+def _stripe_key_mode(key: str) -> str:
+    v = (key or "").strip()
+    if not v:
+        return "missing"
+    if v.startswith(("sk_live_", "pk_live_")):
+        return "live"
+    if v.startswith(("sk_test_", "pk_test_")):
+        return "test"
+    return "unknown"
+
+
 app = Flask(__name__)
 
 _log_level_name = (os.environ.get("LOG_LEVEL") or "INFO").strip().upper()
@@ -1939,21 +1954,41 @@ def _stripe_checkout_base_url() -> str:
     return ""
 
 
-def _stripe_process_paid_return(csid: str):
-    """Verify Stripe Checkout session, record order once, then redirect to /checkout/success (PRG)."""
+def _set_checkout_success_view(
+    *,
+    order_number: str,
+    total_cents: int,
+    receipt_sent: bool,
+    detail: str,
+    is_new_order: bool,
+    products: List[Dict[str, Any]],
+) -> None:
+    session["checkout_success_view"] = {
+        "order_number": order_number,
+        "total_cents": total_cents,
+        "receipt_sent": receipt_sent,
+        "detail": detail,
+        "is_new_order": is_new_order,
+        "products": products,
+    }
+
+
+def _stripe_finalize_checkout_session(csid: str, *, source: str) -> Dict[str, Any]:
+    """Finalize a paid Checkout Session idempotently for either browser return or webhook delivery."""
     secret = _stripe_secret_key()
     if not secret:
-        app.logger.error("stripe_paid_return_aborted reason=missing_stripe_secret")
-        flash("Payments are not configured.", "error")
-        return redirect(url_for("shop"), code=303)
+        app.logger.error("stripe_finalize_aborted source=%s reason=missing_stripe_secret", source)
+        return {"status": "missing_secret", "user_message": "Payments are not configured."}
     stripe.api_key = secret
 
     try:
         cs = stripe.checkout.Session.retrieve(csid, expand=["line_items"])
     except stripe.error.StripeError as exc:
         app.logger.warning("stripe_session_retrieve_failed session_id=%s error=%s", csid[:32], exc)
-        flash("Could not verify your payment. Contact us with your receipt.", "error")
-        return redirect(url_for("shop"), code=303)
+        return {
+            "status": "stripe_error",
+            "user_message": "Could not verify your payment. Contact us with your receipt.",
+        }
 
     if (cs.payment_status or "") != "paid":
         app.logger.warning(
@@ -1961,8 +1996,7 @@ def _stripe_process_paid_return(csid: str):
             csid[:32],
             cs.payment_status,
         )
-        flash("Payment was not completed.", "error")
-        return redirect(url_for("shop"), code=303)
+        return {"status": "not_paid", "user_message": "Payment was not completed."}
 
     with database.get_db() as conn:
         existing = conn.execute(
@@ -1990,13 +2024,29 @@ def _stripe_process_paid_return(csid: str):
                         existing["order_number"],
                     )
             prows = _order_success_product_rows(conn, oid_e)
+            if source != "webhook":
+                geo_row = conn.execute(
+                    "SELECT geo_country, geo_city FROM orders WHERE id = ?",
+                    (oid_e,),
+                ).fetchone()
+                if geo_row and not (geo_row["geo_country"] or geo_row["geo_city"]):
+                    checkout_ip = client_ip_from_request(request)
+                    geo_purchase = geo_lookup(checkout_ip)
+                    gc = (geo_purchase.get("country_code") or "").strip() or None
+                    gcity = (geo_purchase.get("city") or "").strip() or None
+                    conn.execute(
+                        "UPDATE orders SET geo_country = ?, geo_city = ? WHERE id = ?",
+                        (gc, (gcity[:128] if gcity else None), oid_e),
+                    )
             app.logger.info(
-                "stripe_checkout_idempotent_replay order_id=%s order_number=%s session_id=%s",
+                "stripe_checkout_idempotent_replay order_id=%s order_number=%s session_id=%s source=%s",
                 oid_e,
                 existing["order_number"],
                 csid[:24],
+                source,
             )
-            session["checkout_success_view"] = {
+            return {
+                "status": "ok",
                 "order_number": str(existing["order_number"]),
                 "total_cents": total,
                 "receipt_sent": receipt_sent_flag,
@@ -2004,7 +2054,6 @@ def _stripe_process_paid_return(csid: str):
                 "is_new_order": False,
                 "products": prows,
             }
-            return redirect(url_for("checkout_success"), code=303)
 
     raw_cs = cs.to_dict()
     meta = dict(raw_cs.get("metadata") or {})
@@ -2019,8 +2068,11 @@ def _stripe_process_paid_return(csid: str):
 
     idn = _stripe_identity_from_checkout_session(raw_cs, csid)
     if not idn:
-        flash("Order could not be recorded (incomplete details). Contact us.", "error")
-        return redirect(url_for("shop"), code=303)
+        app.logger.warning("stripe_order_identity_missing session_id=%s source=%s", csid[:32], source)
+        return {
+            "status": "invalid_identity",
+            "user_message": "Order could not be recorded (incomplete details). Contact us.",
+        }
 
     email = idn["email"]
     phone = idn["phone"]
@@ -2061,12 +2113,15 @@ def _stripe_process_paid_return(csid: str):
                 pairs.append((int(left.strip()), max(1, int(right.strip()))))
             except (TypeError, ValueError):
                 app.logger.warning(
-                    "stripe_order_invalid_cart session_id=%s cart_spec=%r",
+                    "stripe_order_invalid_cart session_id=%s cart_spec=%r source=%s",
                     csid[:32],
                     cart_spec[:200] if cart_spec else "",
+                    source,
                 )
-                flash("Order could not be recorded (invalid cart). Contact us.", "error")
-                return redirect(url_for("shop"), code=303)
+                return {
+                    "status": "invalid_cart",
+                    "user_message": "Order could not be recorded (invalid cart). Contact us.",
+                }
         pairs.sort(key=lambda t: t[0])
         order_lines: List[Tuple[int, int, int, Any]] = []
         subtotal_cents = 0
@@ -2075,25 +2130,31 @@ def _stripe_process_paid_return(csid: str):
                 p = database.product_by_id(conn, pid)
                 if not p or not database.product_add_to_cart_enabled(p):
                     app.logger.warning(
-                        "stripe_order_product_unavailable session_id=%s product_id=%s",
+                        "stripe_order_product_unavailable session_id=%s product_id=%s source=%s",
                         csid[:32],
                         pid,
+                        source,
                     )
-                    flash("Order could not be recorded (product unavailable). Contact us.", "error")
-                    return redirect(url_for("shop"), code=303)
+                    return {
+                        "status": "product_unavailable",
+                        "user_message": "Order could not be recorded (product unavailable). Contact us.",
+                    }
                 unit = int(p["price_cents"])
                 subtotal_cents += unit * qty
                 order_lines.append((pid, qty, unit, p))
         expected_total = subtotal_cents + shipping_cents
         if paid_total != expected_total:
             app.logger.warning(
-                "stripe_amount_mismatch session_id=%s paid_total=%s expected_total=%s mode=cart",
+                "stripe_amount_mismatch session_id=%s paid_total=%s expected_total=%s mode=cart source=%s",
                 csid[:32],
                 paid_total,
                 expected_total,
+                source,
             )
-            flash("Payment amount mismatch. Contact us with your Stripe receipt.", "error")
-            return redirect(url_for("shop"), code=303)
+            return {
+                "status": "amount_mismatch",
+                "user_message": "Payment amount mismatch. Contact us with your Stripe receipt.",
+            }
         total_with_shipping = paid_total
         with database.get_db() as conn:
             cur = conn.execute(
@@ -2146,21 +2207,23 @@ def _stripe_process_paid_return(csid: str):
             )
             oid = int(cur.lastrowid)
             app.logger.info(
-                "order_inserted order_id=%s order_number=%s stripe_session=%s affiliate_user_id=%s total_cents=%s",
+                "order_inserted order_id=%s order_number=%s stripe_session=%s affiliate_user_id=%s total_cents=%s source=%s",
                 oid,
                 order_number,
                 csid[:28],
                 aff_id or 0,
                 total_with_shipping,
+                source,
             )
-            checkout_ip = client_ip_from_request(request)
-            geo_purchase = geo_lookup(checkout_ip)
-            gc = (geo_purchase.get("country_code") or "").strip() or None
-            gcity = (geo_purchase.get("city") or "").strip() or None
-            conn.execute(
-                "UPDATE orders SET geo_country = ?, geo_city = ? WHERE id = ?",
-                (gc, (gcity[:128] if gcity else None), oid),
-            )
+            if source != "webhook":
+                checkout_ip = client_ip_from_request(request)
+                geo_purchase = geo_lookup(checkout_ip)
+                gc = (geo_purchase.get("country_code") or "").strip() or None
+                gcity = (geo_purchase.get("city") or "").strip() or None
+                conn.execute(
+                    "UPDATE orders SET geo_country = ?, geo_city = ? WHERE id = ?",
+                    (gc, (gcity[:128] if gcity else None), oid),
+                )
             for pid, qty, unit, _p in order_lines:
                 conn.execute(
                     """
@@ -2191,25 +2254,31 @@ def _stripe_process_paid_return(csid: str):
             p = database.product_by_id(conn, pid)
         if not p:
             app.logger.warning(
-                "stripe_order_product_missing session_id=%s product_id=%s",
+                "stripe_order_product_missing session_id=%s product_id=%s source=%s",
                 csid[:32],
                 pid,
+                source,
             )
-            flash("Order could not be recorded (product missing). Contact us.", "error")
-            return redirect(url_for("shop"), code=303)
+            return {
+                "status": "product_missing",
+                "user_message": "Order could not be recorded (product missing). Contact us.",
+            }
 
         unit = int(p["price_cents"])
         subtotal_cents = unit * qty
         expected_total = subtotal_cents + shipping_cents
         if paid_total != expected_total:
             app.logger.warning(
-                "stripe_amount_mismatch session_id=%s paid_total=%s expected_total=%s mode=single",
+                "stripe_amount_mismatch session_id=%s paid_total=%s expected_total=%s mode=single source=%s",
                 csid[:32],
                 paid_total,
                 expected_total,
+                source,
             )
-            flash("Payment amount mismatch. Contact us with your Stripe receipt.", "error")
-            return redirect(url_for("shop"), code=303)
+            return {
+                "status": "amount_mismatch",
+                "user_message": "Payment amount mismatch. Contact us with your Stripe receipt.",
+            }
 
         total_with_shipping = paid_total
 
@@ -2264,21 +2333,23 @@ def _stripe_process_paid_return(csid: str):
             )
             oid = int(cur.lastrowid)
             app.logger.info(
-                "order_inserted order_id=%s order_number=%s stripe_session=%s affiliate_user_id=%s total_cents=%s",
+                "order_inserted order_id=%s order_number=%s stripe_session=%s affiliate_user_id=%s total_cents=%s source=%s",
                 oid,
                 order_number,
                 csid[:28],
                 aff_id or 0,
                 total_with_shipping,
+                source,
             )
-            checkout_ip = client_ip_from_request(request)
-            geo_purchase = geo_lookup(checkout_ip)
-            gc = (geo_purchase.get("country_code") or "").strip() or None
-            gcity = (geo_purchase.get("city") or "").strip() or None
-            conn.execute(
-                "UPDATE orders SET geo_country = ?, geo_city = ? WHERE id = ?",
-                (gc, (gcity[:128] if gcity else None), oid),
-            )
+            if source != "webhook":
+                checkout_ip = client_ip_from_request(request)
+                geo_purchase = geo_lookup(checkout_ip)
+                gc = (geo_purchase.get("country_code") or "").strip() or None
+                gcity = (geo_purchase.get("city") or "").strip() or None
+                conn.execute(
+                    "UPDATE orders SET geo_country = ?, geo_city = ? WHERE id = ?",
+                    (gc, (gcity[:128] if gcity else None), oid),
+                )
             conn.execute(
                 """
                 INSERT INTO order_items (order_id, product_id, quantity, unit_price_cents)
@@ -2299,17 +2370,18 @@ def _stripe_process_paid_return(csid: str):
             database.mark_order_receipt_sent(conn, oid)
     else:
         app.logger.warning(
-            "order_receipt_email_failed order_id=%s order_number=%s resend_and_smtp_failed",
+            "order_receipt_email_failed order_id=%s order_number=%s resend_and_smtp_failed source=%s",
             oid,
             order_number,
+            source,
         )
-        flash("Order confirmed, but the confirmation email could not be sent. We will follow up.", "error")
 
     app.logger.info(
-        "checkout_flow_complete order_id=%s order_number=%s receipt_sent=%s",
+        "checkout_flow_complete order_id=%s order_number=%s receipt_sent=%s source=%s",
         oid,
         order_number,
         receipt_ok,
+        source,
     )
 
     detail = (
@@ -2319,7 +2391,8 @@ def _stripe_process_paid_return(csid: str):
     )
     with database.get_db() as conn:
         prows = _order_success_product_rows(conn, oid)
-    session["checkout_success_view"] = {
+    return {
+        "status": "ok",
         "order_number": order_number,
         "total_cents": total_with_shipping,
         "receipt_sent": receipt_ok,
@@ -2327,6 +2400,22 @@ def _stripe_process_paid_return(csid: str):
         "is_new_order": True,
         "products": prows,
     }
+
+
+def _stripe_process_paid_return(csid: str):
+    """Verify Stripe Checkout session, record order once, then redirect to /checkout/success (PRG)."""
+    result = _stripe_finalize_checkout_session(csid, source="return")
+    if result.get("status") != "ok":
+        flash(result.get("user_message") or "Could not verify your payment. Contact us with your receipt.", "error")
+        return redirect(url_for("shop"), code=303)
+    _set_checkout_success_view(
+        order_number=str(result["order_number"]),
+        total_cents=int(result["total_cents"]),
+        receipt_sent=bool(result["receipt_sent"]),
+        detail=str(result["detail"]),
+        is_new_order=bool(result["is_new_order"]),
+        products=list(result["products"]),
+    )
     return redirect(url_for("checkout_success"), code=303)
 
 
@@ -2353,10 +2442,76 @@ def stripe_checkout_cancel():
     return redirect(url_for("cart_view", returned="1"), code=303)
 
 
+@app.route("/webhook", methods=["POST"])
+def stripe_webhook():
+    payload = request.get_data(cache=False, as_text=False)
+    sig_header = (request.headers.get("Stripe-Signature") or "").strip()
+    webhook_secret = _stripe_webhook_secret()
+    if not webhook_secret:
+        app.logger.error("stripe_webhook_rejected reason=missing_webhook_secret")
+        return ("Webhook not configured", 503)
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+    except ValueError:
+        app.logger.warning("stripe_webhook_invalid_payload")
+        return ("Invalid payload", 400)
+    except stripe.error.SignatureVerificationError:
+        app.logger.warning("stripe_webhook_invalid_signature")
+        return ("Invalid signature", 400)
+
+    try:
+        event_type = str(event["type"] or "").strip()
+    except Exception:
+        event_type = ""
+    app.logger.info("stripe_webhook_received type=%s", event_type)
+
+    if event_type == "checkout.session.completed":
+        try:
+            obj = event["data"]["object"] or {}
+        except Exception:
+            obj = {}
+        try:
+            csid = str(obj["id"] or "").strip()
+        except Exception:
+            csid = ""
+        if not csid:
+            app.logger.warning("stripe_webhook_missing_session_id type=%s", event_type)
+            return ("Missing session id", 400)
+        result = _stripe_finalize_checkout_session(csid, source="webhook")
+        if result.get("status") != "ok":
+            app.logger.error(
+                "stripe_webhook_finalize_failed type=%s session_id=%s status=%s",
+                event_type,
+                csid[:24],
+                result.get("status"),
+            )
+            return ("Webhook processing failed", 500)
+        app.logger.info(
+            "stripe_webhook_checkout_completed session_id=%s order_number=%s existing=%s",
+            csid[:24],
+            result["order_number"],
+            not bool(result["is_new_order"]),
+        )
+        return ("", 200)
+
+    if event_type in ("payment_intent.succeeded", "payment_intent.payment_failed"):
+        app.logger.info("stripe_webhook_ignored type=%s", event_type)
+        return ("", 200)
+
+    app.logger.info("stripe_webhook_unhandled type=%s", event_type)
+    return ("", 200)
+
+
 def _stripe_checkout_redirect_from_cart(*, notes: str, error_endpoint: str) -> Any:
     """Create Stripe Checkout for the current session cart; customer completes address & payment on Stripe."""
     secret = _stripe_secret_key()
     if not secret:
+        app.logger.warning(
+            "stripe_checkout_unavailable reason=missing_stripe_secret stripe_public=%s stripe_public_mode=%s",
+            "configured" if _stripe_publishable_key() else "MISSING",
+            _stripe_key_mode(_stripe_publishable_key()),
+        )
         flash("Online payments are not configured.", "error")
         return redirect(url_for(error_endpoint))
     stripe.api_key = secret
@@ -2442,6 +2597,12 @@ def _stripe_checkout_redirect_from_cart(*, notes: str, error_endpoint: str) -> A
             },
         )
     except stripe.error.StripeError as e:
+        app.logger.warning(
+            "stripe_checkout_session_create_failed error=%s base_url=%r line_items=%s",
+            e,
+            base,
+            len(line_items),
+        )
         flash(f"Payment could not be started: {getattr(e, 'user_message', None) or str(e)}", "error")
         return redirect(url_for(error_endpoint))
 
@@ -3493,9 +3654,15 @@ def create_listening_room_user(
 
 
 app.logger.info(
-    "Licorice Locker configuration: stripe_secret=%s resend=%s site_url=%r proxy_trust=%s "
+    "Licorice Locker configuration: stripe_secret=%s stripe_secret_mode=%s stripe_public=%s stripe_public_mode=%s "
+    "stripe_webhook=%s "
+    "resend=%s site_url=%r proxy_trust=%s "
     "(set SITE_URL to your canonical public origin, e.g. https://www.licoricelocker.com)",
     "configured" if _stripe_secret_key() else "MISSING",
+    _stripe_key_mode(_stripe_secret_key()),
+    "configured" if _stripe_publishable_key() else "MISSING",
+    _stripe_key_mode(_stripe_publishable_key()),
+    "configured" if _stripe_webhook_secret() else "MISSING",
     "configured" if (os.environ.get("RESEND_API_KEY") or "").strip() else "off",
     (os.environ.get("SITE_URL") or "").strip() or None,
     bool((os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("TRUST_PROXY") or "").strip()),

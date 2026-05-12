@@ -5322,6 +5322,11 @@ html.lenis body {
   transition-delay: calc(0.16s + var(--ll-wi, 0) * 44ms);
 }
 
+.ll-split-space {
+  display: inline-block;
+  white-space: pre;
+}
+
 .ll-split-line {
   display: inline-block;
   opacity: 0;
