@@ -235,13 +235,13 @@
             <span class="affiliate-field-label">Password</span>
             <input type="password" name="password" id="affiliate-password" required autocomplete="current-password" placeholder="Enter your password">
           </label>
-          <button type="submit" class="btn primary affiliate-modal-primary">Continue</button>
+          <button type="submit" class="btn primary affiliate-modal-primary" id="affiliate-credentials-submit">Continue</button>
         </form>
         <p class="affiliate-modal-forgot"><a href="{{ url_for('forgot_password') }}" id="affiliate-forgot-link">Forgot password?</a></p>
       </div>
 
-      <div id="affiliate-step-2fa" class="affiliate-modal-step" hidden>
-        <p id="affiliate-2fa-setup-hint" class="affiliate-modal-hint" hidden>Scan this QR code with Google Authenticator, Authy, or another authenticator app. Then enter the 6-digit code to finish setup.</p>
+      <div id="affiliate-step-2fa" class="affiliate-modal-step affiliate-modal-step--2fa" hidden>
+        <p id="affiliate-2fa-setup-hint" class="affiliate-modal-hint" hidden>Scan the QR with your authenticator app, then enter the 6-digit code.</p>
         <p id="affiliate-2fa-verify-hint" class="affiliate-modal-hint" hidden>Enter the 6-digit code from your authenticator app.</p>
         <div class="affiliate-modal-qr-wrap">
           <img id="affiliate-totp-qr" alt="" class="affiliate-modal-qr" width="200" height="200" hidden decoding="async">
@@ -305,7 +305,10 @@
     var hintSetup = document.getElementById("affiliate-2fa-setup-hint");
     var hintVerify = document.getElementById("affiliate-2fa-verify-hint");
     var totpInput = document.getElementById("affiliate-totp-code");
+    var btnCred = document.getElementById("affiliate-credentials-submit");
+    var btnCredDefault = btnCred ? btnCred.textContent : "";
     var btn2fa = document.getElementById("affiliate-2fa-submit");
+    var btn2faDefault = btn2fa ? btn2fa.textContent : "";
     var backCred = document.getElementById("affiliate-back-credentials");
     if (!modal || !openBtn) return;
 
@@ -327,6 +330,8 @@
       if (hintSetup) hintSetup.hidden = true;
       if (hintVerify) hintVerify.hidden = true;
       if (totpInput) totpInput.value = "";
+      if (btnCred) { btnCred.disabled = false; btnCred.textContent = btnCredDefault; }
+      if (btn2fa) { btn2fa.disabled = false; btn2fa.textContent = btn2faDefault; }
       setError("");
     }
 
@@ -338,6 +343,8 @@
       if (hintVerify) hintVerify.hidden = isSetup;
       if (qrImg) qrImg.hidden = !isSetup;
       if (totpInput) { totpInput.value = ""; totpInput.focus(); }
+      var panel = modal.querySelector(".affiliate-modal-panel");
+      if (panel) panel.scrollTop = 0;
     }
 
     function openModal() {
@@ -390,6 +397,10 @@
       formCred.addEventListener("submit", function (e) {
         e.preventDefault();
         setError("");
+        if (btnCred) {
+          btnCred.disabled = true;
+          btnCred.textContent = "Checking…";
+        }
         var email = (document.getElementById("affiliate-email") || {}).value || "";
         var password = (document.getElementById("affiliate-password") || {}).value || "";
         fetch(step1Url, {
@@ -422,6 +433,8 @@
               setError(msg);
               return;
             }
+            var pwEl = document.getElementById("affiliate-password");
+            if (pwEl) pwEl.value = "";
             if (x.j.step === "setup" && x.j.qr && qrImg) {
               qrImg.src = x.j.qr;
             }
@@ -429,12 +442,22 @@
           })
           .catch(function () {
             setError("Network error. Check your connection.");
+          })
+          .finally(function () {
+            if (btnCred) {
+              btnCred.disabled = false;
+              btnCred.textContent = btnCredDefault;
+            }
           });
       });
     }
 
     function submit2fa() {
       setError("");
+      if (btn2fa) {
+        btn2fa.disabled = true;
+        btn2fa.textContent = "Signing in…";
+      }
       var code = ((totpInput && totpInput.value) || "").replace(/\s/g, "");
       fetch(step2Url, {
         method: "POST",
@@ -453,10 +476,19 @@
             setError(x.j && x.j.error === "invalid_code" ? "Invalid code. Check your authenticator app." : "Something went wrong.");
             return;
           }
-          if (x.j.redirect) window.location.href = x.j.redirect;
+          if (x.j.redirect) {
+            closeModal();
+            window.location.assign(x.j.redirect);
+          }
         })
         .catch(function () {
           setError("Network error. Check your connection.");
+        })
+        .finally(function () {
+          if (btn2fa) {
+            btn2fa.disabled = false;
+            btn2fa.textContent = btn2faDefault;
+          }
         });
     }
 

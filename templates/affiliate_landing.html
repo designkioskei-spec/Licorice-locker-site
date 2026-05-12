@@ -10,7 +10,7 @@
     </div>
   </div>
   <div class="aff-landing-below-banner">
-    {% if page.tagline %}
+    {% if (page.tagline or '')|trim %}
     <p class="aff-landing-subtitle">{{ page.tagline }}</p>
     {% endif %}
     {% if page.instagram_url or page.tiktok_url %}
@@ -19,7 +19,7 @@
       {% if page.tiktok_url %}<a href="{{ page.tiktok_url }}" target="_blank" rel="noopener">TikTok</a>{% endif %}
     </div>
     {% endif %}
-    {% set desc = (page.description or '')|trim %}
+    {% set desc = ((page.description or '')|trim)|replace('\r\n', '\n')|replace('\r', '\n') %}
     {% if desc %}
     <div class="aff-landing-bio">
       {% if '\n\n' in desc %}

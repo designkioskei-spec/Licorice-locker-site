@@ -204,7 +204,11 @@
     document.querySelectorAll(".top-banner-tagline").forEach(splitWords);
     document.querySelectorAll(".link-series-promo-title").forEach(splitWords);
     document.querySelectorAll(".aff-banner h1").forEach(splitWords);
-    document.querySelectorAll(".shop-intro-text").forEach(splitSentences);
+    document.querySelectorAll(".shop-intro-text").forEach(function (el) {
+      // Listening Room intro sits under the banner without [data-ll-reveal]; split lines stay opacity:0 forever.
+      if (el.closest(".listening-room-intro")) return;
+      splitSentences(el);
+    });
   }
 
   function initHeroChoreography() {

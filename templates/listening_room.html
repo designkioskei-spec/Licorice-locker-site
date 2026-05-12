@@ -8,11 +8,24 @@
 </section>
 
 <section class="shop-intro listening-room-intro" aria-label="About this Listening Room">
-  {% if page.tagline %}
-  <p class="shop-intro-text">{{ page.tagline }}</p>
+  {% if (page.tagline or '')|trim %}
+  <p class="shop-intro-text shop-intro-text--subtitle">{{ page.tagline }}</p>
   {% endif %}
-  {% if page.description %}
-  <p class="shop-intro-text">{{ page.description }}</p>
+  {% set bio_raw = ((page.description or '')|trim)|replace('\r\n', '\n')|replace('\r', '\n') %}
+  {% if bio_raw %}
+  <div class="listening-room-bio">
+    {% if '\n\n' in bio_raw %}
+      {% set parts = bio_raw.split('\n\n', 1) %}
+      <p class="shop-intro-text shop-intro-text--bio-lead">{{ parts[0]|trim }}</p>
+      <p class="shop-intro-text shop-intro-text--bio-body">{{ parts[1]|trim }}</p>
+    {% elif '\n' in bio_raw %}
+      {% set parts = bio_raw.split('\n', 1) %}
+      <p class="shop-intro-text shop-intro-text--bio-lead">{{ parts[0]|trim }}</p>
+      <p class="shop-intro-text shop-intro-text--bio-body">{{ parts[1]|trim }}</p>
+    {% else %}
+      <p class="shop-intro-text shop-intro-text--bio-lead">{{ bio_raw }}</p>
+    {% endif %}
+  </div>
   {% endif %}
   {% if page.instagram_url or page.tiktok_url %}
   <div class="listening-room-social">
