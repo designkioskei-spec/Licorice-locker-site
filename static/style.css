@@ -30,6 +30,17 @@
   --ll-ease-spring: cubic-bezier(0.34, 1.3, 0.64, 1);
   --ll-dur: 0.92s;
   --ll-dur-slow: 1.18s;
+  /* Add to cart — 80% of prior dimensions (20% smaller); touch floor on coarse pointers */
+  --atc-scale: 0.8;
+  --atc-circle-size: calc(3.35rem * 1.7 * 1.6);
+  --atc-circle-padding-y: 0.44rem;
+  --atc-circle-padding-x: 0.4rem;
+  --atc-circle-font: clamp(0.76rem, 1.92vw, 0.96rem);
+  --atc-circle-text-gap: 0.05rem;
+  --atc-pill-font: 0.6rem;
+  --atc-pill-padding-y: 0.52rem;
+  --atc-pill-padding-x: 1.08rem;
+  --atc-pill-min-height-touch: 2.75rem;
 }
 
 * {
@@ -418,20 +429,24 @@ body {
   margin: 0;
 }
 
-.soundwave-add-btn {
-  /* Match Riff add-to-cart size */
-  width: calc(3.35rem * 1.7 * 2);
-  height: calc(3.35rem * 1.7 * 2);
-  min-width: calc(3.35rem * 1.7 * 2);
-  min-height: calc(3.35rem * 1.7 * 2);
+/* Featured product circles — shared add-to-cart control (shop + Listening Room) */
+.soundwave-add-btn,
+.riff-add-btn,
+.harmony-add-btn,
+.melody-add-btn,
+.allegro-add-btn {
+  width: var(--atc-circle-size);
+  height: var(--atc-circle-size);
+  min-width: var(--atc-circle-size);
+  min-height: var(--atc-circle-size);
   border-radius: 50%;
   border: none;
-  padding: 0.55rem 0.5rem;
+  padding: var(--atc-circle-padding-y) var(--atc-circle-padding-x);
   background: var(--accent);
   color: var(--on-primary);
   font-family: var(--font);
   font-weight: 600;
-  font-size: clamp(0.95rem, 2.4vw, 1.2rem);
+  font-size: var(--atc-circle-font);
   line-height: 1.15;
   letter-spacing: 0.02em;
   display: inline-flex;
@@ -440,34 +455,46 @@ body {
   text-align: center;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
-  box-shadow: 0 2px 8px rgba(37, 24, 29, 0.12);
+  box-shadow: 0 2px 6px rgba(37, 24, 29, 0.12);
 }
 
-.soundwave-add-btn-text {
+.soundwave-add-btn-text,
+.riff-add-btn-text,
+.harmony-add-btn-text,
+.melody-add-btn-text,
+.allegro-add-btn-text {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.06rem;
+  gap: var(--atc-circle-text-gap);
   max-width: 92%;
 }
 
-.soundwave-add-line {
-  display: block;
-}
-
-.soundwave-add-btn:hover {
+.soundwave-add-btn:hover,
+.riff-add-btn:hover,
+.harmony-add-btn:hover,
+.melody-add-btn:hover,
+.allegro-add-btn:hover {
   transform: scale(1.05);
-  box-shadow: 0 3px 10px rgba(37, 24, 29, 0.1);
+  box-shadow: 0 2px 8px rgba(37, 24, 29, 0.1);
 }
 
-.soundwave-add-btn:active {
+.soundwave-add-btn:active,
+.riff-add-btn:active,
+.harmony-add-btn:active,
+.melody-add-btn:active,
+.allegro-add-btn:active {
   background: var(--accent-hover);
   transform: scale(0.96);
-  box-shadow: 0 1px 6px rgba(37, 24, 29, 0.12);
+  box-shadow: 0 1px 5px rgba(37, 24, 29, 0.12);
 }
 
-.soundwave-add-btn:focus-visible {
+.soundwave-add-btn:focus-visible,
+.riff-add-btn:focus-visible,
+.harmony-add-btn:focus-visible,
+.melody-add-btn:focus-visible,
+.allegro-add-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -560,58 +587,12 @@ body {
   justify-content: flex-end;
 }
 
-.riff-add-btn {
-  /* 100% larger than prior Riff circle: 2 × (3.35rem × 1.7) */
-  width: calc(3.35rem * 1.7 * 2);
-  height: calc(3.35rem * 1.7 * 2);
-  min-width: calc(3.35rem * 1.7 * 2);
-  min-height: calc(3.35rem * 1.7 * 2);
-  border-radius: 50%;
-  border: none;
-  padding: 0.55rem 0.5rem;
-  background: var(--accent);
-  color: var(--on-primary);
-  font-family: var(--font);
-  font-weight: 600;
-  font-size: clamp(0.95rem, 2.4vw, 1.2rem);
-  line-height: 1.15;
-  letter-spacing: 0.02em;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
-  box-shadow: 0 2px 8px rgba(37, 24, 29, 0.12);
-}
-
-.riff-add-btn-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.06rem;
-  max-width: 92%;
-}
-
-.riff-add-line {
+.riff-add-line,
+.harmony-add-line,
+.melody-add-line,
+.allegro-add-line,
+.soundwave-add-line {
   display: block;
-}
-
-.riff-add-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 3px 10px rgba(37, 24, 29, 0.1);
-}
-
-.riff-add-btn:active {
-  background: var(--accent-hover);
-  transform: scale(0.96);
-  box-shadow: 0 1px 6px rgba(37, 24, 29, 0.12);
-}
-
-.riff-add-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
 }
 
 .harmony-showcase {
@@ -693,58 +674,6 @@ body {
   justify-content: flex-start;
 }
 
-.harmony-add-btn {
-  width: calc(3.35rem * 1.7 * 2);
-  height: calc(3.35rem * 1.7 * 2);
-  min-width: calc(3.35rem * 1.7 * 2);
-  min-height: calc(3.35rem * 1.7 * 2);
-  border-radius: 50%;
-  border: none;
-  padding: 0.55rem 0.5rem;
-  background: var(--accent);
-  color: var(--on-primary);
-  font-family: var(--font);
-  font-weight: 600;
-  font-size: clamp(0.95rem, 2.4vw, 1.2rem);
-  line-height: 1.15;
-  letter-spacing: 0.02em;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
-  box-shadow: 0 2px 8px rgba(37, 24, 29, 0.12);
-}
-
-.harmony-add-btn-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.06rem;
-  max-width: 92%;
-}
-
-.harmony-add-line {
-  display: block;
-}
-
-.harmony-add-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 3px 10px rgba(37, 24, 29, 0.1);
-}
-
-.harmony-add-btn:active {
-  background: var(--accent-hover);
-  transform: scale(0.96);
-  box-shadow: 0 1px 6px rgba(37, 24, 29, 0.12);
-}
-
-.harmony-add-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
 
 .melody-showcase {
   width: 100vw;
@@ -835,58 +764,6 @@ body {
   justify-content: flex-end;
 }
 
-.melody-add-btn {
-  width: calc(3.35rem * 1.7 * 2);
-  height: calc(3.35rem * 1.7 * 2);
-  min-width: calc(3.35rem * 1.7 * 2);
-  min-height: calc(3.35rem * 1.7 * 2);
-  border-radius: 50%;
-  border: none;
-  padding: 0.55rem 0.5rem;
-  background: var(--accent);
-  color: var(--on-primary);
-  font-family: var(--font);
-  font-weight: 600;
-  font-size: clamp(0.95rem, 2.4vw, 1.2rem);
-  line-height: 1.15;
-  letter-spacing: 0.02em;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 2px 8px rgba(37, 24, 29, 0.12);
-}
-
-.melody-add-btn-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.06rem;
-  max-width: 92%;
-}
-
-.melody-add-line {
-  display: block;
-}
-
-.melody-add-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 3px 10px rgba(37, 24, 29, 0.1);
-}
-
-.melody-add-btn:active {
-  background: var(--accent-hover);
-  transform: scale(0.96);
-  box-shadow: 0 1px 6px rgba(37, 24, 29, 0.12);
-}
-
-.melody-add-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
 
 .allegro-showcase {
   width: 100vw;
@@ -994,58 +871,6 @@ body {
   justify-content: flex-start;
 }
 
-.allegro-add-btn {
-  width: calc(3.35rem * 1.7 * 2);
-  height: calc(3.35rem * 1.7 * 2);
-  min-width: calc(3.35rem * 1.7 * 2);
-  min-height: calc(3.35rem * 1.7 * 2);
-  border-radius: 50%;
-  border: none;
-  padding: 0.55rem 0.5rem;
-  background: var(--accent);
-  color: var(--on-primary);
-  font-family: var(--font);
-  font-weight: 600;
-  font-size: clamp(0.95rem, 2.4vw, 1.2rem);
-  line-height: 1.15;
-  letter-spacing: 0.02em;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 2px 8px rgba(37, 24, 29, 0.12);
-}
-
-.allegro-add-btn-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.06rem;
-  max-width: 92%;
-}
-
-.allegro-add-line {
-  display: block;
-}
-
-.allegro-add-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 3px 10px rgba(37, 24, 29, 0.1);
-}
-
-.allegro-add-btn:active {
-  background: var(--accent-hover);
-  transform: scale(0.96);
-  box-shadow: 0 1px 6px rgba(37, 24, 29, 0.12);
-}
-
-.allegro-add-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
 
 @media (max-width: 520px) {
   .magazine-product-row .soundwave-showcase-inner.magazine-showcase-inner,
@@ -2281,6 +2106,24 @@ body.page-checkout-success .main {
     0 1px 0 rgba(255, 255, 255, 0.1) inset,
     0 2px 8px rgba(37, 24, 29, 0.12);
   transform: translate3d(calc(var(--ll-mx) * 0.35), calc(var(--ll-my) * 0.35), 0) scale(0.98);
+}
+
+/* Pill add-to-cart (product detail, grids) — 20% smaller than default .btn.primary */
+.btn.primary.btn-add-to-cart,
+form.js-shop-add-cart .btn.primary,
+form.product-detail-buy .btn.primary,
+form[action*="/cart/add"] .btn.primary {
+  font-size: var(--atc-pill-font);
+  padding: var(--atc-pill-padding-y) var(--atc-pill-padding-x);
+}
+
+@media (pointer: coarse) {
+  .btn.primary.btn-add-to-cart,
+  form.js-shop-add-cart .btn.primary,
+  form.product-detail-buy .btn.primary,
+  form[action*="/cart/add"] .btn.primary {
+    min-height: var(--atc-pill-min-height-touch);
+  }
 }
 
 .btn:not(.primary) {
