@@ -4532,6 +4532,107 @@ body.affiliate-terms-modal-open {
   max-width: 100%;
 }
 
+/* Storefront index + Listening Room home — 30% tighter vertical rhythm */
+.page-shop,
+.page-listening-room {
+  --sf-v: 0.7;
+}
+
+.page-shop .main,
+.page-listening-room .main {
+  padding-top: calc(2rem * var(--sf-v));
+  padding-bottom: calc(4.5rem * var(--sf-v));
+}
+
+.page-shop .shop-intro {
+  padding-top: calc(1.25rem * var(--sf-v));
+  padding-bottom: calc(1.75rem * var(--sf-v));
+  margin-bottom: calc(0.25rem * var(--sf-v));
+}
+
+.page-listening-room .shop-intro.listening-room-intro {
+  padding-top: clamp(calc(0.5rem * var(--sf-v)), calc(1.4vw * var(--sf-v)), calc(0.75rem * var(--sf-v)));
+}
+
+.page-listening-room .listening-room-intro .listening-room-bio {
+  margin-top: calc(0.35rem * var(--sf-v));
+}
+
+.page-listening-room .listening-room-intro .shop-intro-text--bio-body {
+  margin-top: calc(0.85rem * var(--sf-v));
+}
+
+.page-listening-room .listening-room-intro .shop-intro-text:not(:first-child) {
+  margin-top: calc(0.75rem * var(--sf-v));
+}
+
+.page-listening-room .listening-room-social {
+  margin-top: calc(1rem * var(--sf-v));
+}
+
+.page-shop .vinyl-manifesto,
+.page-listening-room .vinyl-manifesto {
+  padding-top: clamp(calc(1.75rem * var(--sf-v)), calc(5vw * var(--sf-v)), calc(3.5rem * var(--sf-v)));
+  padding-bottom: clamp(calc(1.75rem * var(--sf-v)), calc(5vw * var(--sf-v)), calc(3.5rem * var(--sf-v)));
+}
+
+.page-shop .vinyl-manifesto-duo,
+.page-listening-room .vinyl-manifesto-duo {
+  gap: clamp(calc(2rem * var(--sf-v)), calc(5vw * var(--sf-v)), calc(3.5rem * var(--sf-v)));
+}
+
+.page-shop .magazine-product-row,
+.page-listening-room .magazine-product-row {
+  margin-top: clamp(calc(3.5rem * var(--sf-v)), calc(11vw * var(--sf-v)), calc(8.75rem * var(--sf-v)));
+  margin-bottom: clamp(calc(3.5rem * var(--sf-v)), calc(11vw * var(--sf-v)), calc(8.75rem * var(--sf-v)));
+}
+
+.page-shop .magazine-product-row .magazine-product-info,
+.page-listening-room .magazine-product-row .magazine-product-info {
+  margin-top: calc(1.25rem * var(--sf-v));
+}
+
+.page-shop .magazine-product-row .magazine-product-info .soundwave-add-form,
+.page-shop .magazine-product-row .magazine-product-info .riff-add-form,
+.page-shop .magazine-product-row .magazine-product-info .harmony-add-form,
+.page-shop .magazine-product-row .magazine-product-info .melody-add-form,
+.page-shop .magazine-product-row .magazine-product-info .allegro-add-form,
+.page-listening-room .magazine-product-row .magazine-product-info .soundwave-add-form,
+.page-listening-room .magazine-product-row .magazine-product-info .riff-add-form,
+.page-listening-room .magazine-product-row .magazine-product-info .harmony-add-form,
+.page-listening-room .magazine-product-row .magazine-product-info .melody-add-form,
+.page-listening-room .magazine-product-row .magazine-product-info .allegro-add-form {
+  margin-top: calc(1rem * var(--sf-v));
+}
+
+.page-shop .magazine-product-row--stagger .magazine-showcase-inner,
+.page-listening-room .magazine-product-row--stagger .magazine-showcase-inner {
+  padding-top: clamp(calc(0.35rem * var(--sf-v)), calc(1.5vw * var(--sf-v)), calc(1rem * var(--sf-v)));
+}
+
+.page-shop .link-series-promo,
+.page-listening-room .link-series-promo {
+  margin-bottom: calc(1.5rem * var(--sf-v));
+  padding-bottom: calc(0.5rem * var(--sf-v));
+}
+
+.page-shop .link-series-promo-caption,
+.page-listening-room .link-series-promo-caption {
+  padding-top: calc(1.1rem * var(--sf-v));
+  padding-bottom: calc(0.35rem * var(--sf-v));
+}
+
+.page-shop .product-grid,
+.page-listening-room .product-grid {
+  gap: calc(2.5rem * var(--sf-v));
+}
+
+.page-shop .product-card,
+.page-listening-room .product-card {
+  padding-top: calc(1.5rem * var(--sf-v));
+  padding-bottom: calc(1.5rem * var(--sf-v));
+}
+
 /* ——— The Listening Room (public program / conversion page) ——— */
 body.listening-room-program .main {
   max-width: none;
