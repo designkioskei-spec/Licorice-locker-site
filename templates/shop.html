@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Shop — Licorice Locker{% endblock %}
 {% block body_class %}page-shop{% endblock %}
+{% from '_vinyl_manifesto_block.html' import vinyl_manifesto, vinyl_manifesto_duo %}
 {% block content %}
 <section class="shop-hero-banner" aria-label="Featured" data-ll-reveal="up">
   <p class="shop-hero-banner-tagline">Art inspired by music</p>
@@ -20,6 +21,8 @@
     Liquorice Locker is where music becomes art — a design-led collection of minimalist vinyl record displays inspired by architecture, album artwork, and the emotional power of sound. Created by designer Joshua French, each piece is made to let the record take centre stage, turning the albums you love into sculptural pieces that shape the atmosphere of a room. Instead of hiding music in crates or shelves, Liquorice Locker brings it into the open, where colour, typography, and soundwave artwork become part of your space and part of your identity. Designed with simplicity, precision, and timeless materials, each display doesn’t compete with the music — it frames it.
   </p>
 </section>
+
+{{ vinyl_manifesto('Vinyl has never been about convenience.', 'left', 'square', 'up', 12) }}
 
 {% if sound_wave_product %}
 <section class="soundwave-showcase magazine-product-row magazine-product-row--start" aria-label="Sound Wave product" data-ll-reveal="left">
@@ -55,9 +58,13 @@
 </section>
 {% endif %}
 
+{{ vinyl_manifesto('In a world of infinite playlists and instant access, collecting records is a conscious choice. It is a signal of identity. Every album on a shelf tells a story about who we are, what we value, and the communities we belong to.', 'right', 'wide', 'right', 8) }}
+
 {% if sound_wave_product or riff_product %}
 {% include '_link_series_banner.html' %}
 {% endif %}
+
+{{ vinyl_manifesto('The vinyl community is built on discovery, craftsmanship, conversation, and culture. Records are not simply objects; they are artefacts that connect people across generations through a shared appreciation of music and design.', 'center', 'wide', 'up', 16) }}
 
 {% if riff_product %}
 <section class="riff-showcase magazine-product-row magazine-product-row--end magazine-product-row--stagger" aria-label="Riff product" data-ll-reveal="right">
@@ -95,6 +102,8 @@
 </section>
 {% endif %}
 
+{{ vinyl_manifesto('At Liquorice Locker, we believe the way a record is displayed should honour the art it contains. Our pieces are not designed to hide collections away. They are designed to celebrate them.', 'left', 'wide', 'left', 10) }}
+
 {% if harmony_product %}
 <section class="harmony-showcase magazine-product-row magazine-product-row--start" aria-label="Harmony product" data-ll-reveal="left">
   <div class="harmony-showcase-inner magazine-showcase-inner">
@@ -130,6 +139,8 @@
   </div>
 </section>
 {% endif %}
+
+{{ vinyl_manifesto('Each display is created as a piece of functional art—an object that elevates the album, the room, and the experience of listening. Because when someone chooses to display a record, they are not just showcasing music. They are sharing a part of themselves.', 'right', 'wide', 'right', 12) }}
 
 {% if melody_product %}
 <section class="melody-showcase magazine-product-row magazine-product-row--end magazine-product-row--stagger" aria-label="Melody product" data-ll-reveal="right">
@@ -167,6 +178,8 @@
 </section>
 {% endif %}
 
+{{ vinyl_manifesto('You are not buying a holder.', 'center', 'square', 'up', 8) }}
+
 {% if allegro_product %}
 <section class="allegro-showcase magazine-product-row magazine-product-row--start" aria-label="Allegra product" data-ll-reveal="left">
   <div class="allegro-showcase-inner magazine-showcase-inner">
@@ -202,6 +215,10 @@
   </div>
 </section>
 {% endif %}
+
+{{ vinyl_manifesto('You are investing in a stage for the artwork, the stories, and the culture that make vinyl collecting meaningful.', 'left', 'wide', 'left', 14) }}
+
+{{ vinyl_manifesto_duo('Music deserves more than storage.', 'It deserves to be seen.', 'up', 20) }}
 
 {% set grid_reveal = namespace(i=0) %}
 <div class="product-grid">

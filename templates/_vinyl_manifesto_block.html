@@ -1,0 +1,31 @@
+{# Decorative square type blocks — shop + Listening Room negative space. #}
+{% macro vinyl_manifesto(text, align='left', variant='square', reveal='up', delay=0) %}
+<aside
+  class="vinyl-manifesto vinyl-manifesto--align-{{ align }} vinyl-manifesto--{{ variant }}"
+  aria-label="Brand narrative"
+  data-ll-reveal="{{ reveal }}"
+  {% if delay %}data-ll-reveal-delay="{{ delay }}"{% endif %}
+>
+  <div class="vinyl-manifesto-square">
+    <p class="vinyl-manifesto-text">{{ text }}</p>
+  </div>
+</aside>
+{% endmacro %}
+
+{% macro vinyl_manifesto_duo(text_a, text_b, reveal='up', delay=0) %}
+<aside
+  class="vinyl-manifesto vinyl-manifesto--align-center vinyl-manifesto--duo-wrap"
+  aria-label="Brand narrative"
+  data-ll-reveal="{{ reveal }}"
+  {% if delay %}data-ll-reveal-delay="{{ delay }}"{% endif %}
+>
+  <div class="vinyl-manifesto-duo">
+    <div class="vinyl-manifesto-square vinyl-manifesto-square--compact">
+      <p class="vinyl-manifesto-text">{{ text_a }}</p>
+    </div>
+    <div class="vinyl-manifesto-square vinyl-manifesto-square--compact">
+      <p class="vinyl-manifesto-text">{{ text_b }}</p>
+    </div>
+  </div>
+</aside>
+{% endmacro %}
