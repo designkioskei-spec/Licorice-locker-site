@@ -41,6 +41,7 @@
   --atc-pill-padding-y: 0.52rem;
   --atc-pill-padding-x: 1.08rem;
   --atc-pill-min-height-touch: 2.75rem;
+  --atc-label-image: url("add-to-cart-label.png");
 }
 
 * {
@@ -325,6 +326,23 @@ body {
   width: min(22rem, 88vw);
 }
 
+/* Shop index — main brand story as a larger square type block */
+.vinyl-manifesto--story .vinyl-manifesto-square {
+  width: min(26rem, 92vw);
+  max-width: 100%;
+}
+
+.vinyl-manifesto--story .vinyl-manifesto-text {
+  font-size: clamp(0.82rem, 1.85vw, 1.05rem);
+  line-height: 1.56;
+  letter-spacing: 0.025em;
+}
+
+.page-shop .vinyl-manifesto--story {
+  margin-top: clamp(2.5rem, 8vw, 5rem);
+  margin-bottom: clamp(1.5rem, 5vw, 3rem);
+}
+
 .vinyl-manifesto-square--compact {
   width: min(15rem, 42vw);
 }
@@ -498,33 +516,42 @@ body {
   margin: 0;
 }
 
-/* Featured product circles — shared add-to-cart control (shop + Listening Room) */
+/* Featured product circles — vinyl label add-to-cart (shop + Listening Room) */
 .soundwave-add-btn,
 .riff-add-btn,
 .harmony-add-btn,
 .melody-add-btn,
-.allegro-add-btn {
+.allegro-add-btn,
+.btn.primary.btn-add-to-cart,
+form.js-shop-add-cart .btn.primary,
+form.product-detail-buy .btn.primary,
+form[action*="/cart/add"] .btn.primary {
+  position: relative;
   width: var(--atc-circle-size);
   height: var(--atc-circle-size);
   min-width: var(--atc-circle-size);
   min-height: var(--atc-circle-size);
   border-radius: 50%;
   border: none;
-  padding: var(--atc-circle-padding-y) var(--atc-circle-padding-x);
-  background: var(--accent);
-  color: var(--on-primary);
-  font-family: var(--font);
-  font-weight: 600;
-  font-size: var(--atc-circle-font);
-  line-height: 1.15;
-  letter-spacing: 0.02em;
+  padding: 0;
+  background-color: transparent;
+  background-image: var(--atc-label-image);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  letter-spacing: 0;
+  text-transform: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
-  box-shadow: 0 2px 6px rgba(37, 24, 29, 0.12);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(37, 24, 29, 0.14);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
 .soundwave-add-btn-text,
@@ -532,30 +559,42 @@ body {
 .harmony-add-btn-text,
 .melody-add-btn-text,
 .allegro-add-btn-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--atc-circle-text-gap);
-  max-width: 92%;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .soundwave-add-btn:hover,
 .riff-add-btn:hover,
 .harmony-add-btn:hover,
 .melody-add-btn:hover,
-.allegro-add-btn:hover {
+.allegro-add-btn:hover,
+.btn.primary.btn-add-to-cart:hover,
+form.js-shop-add-cart .btn.primary:hover,
+form.product-detail-buy .btn.primary:hover,
+form[action*="/cart/add"] .btn.primary:hover {
   transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(37, 24, 29, 0.1);
+  filter: brightness(1.05);
+  box-shadow: 0 4px 14px rgba(37, 24, 29, 0.16);
 }
 
 .soundwave-add-btn:active,
 .riff-add-btn:active,
 .harmony-add-btn:active,
 .melody-add-btn:active,
-.allegro-add-btn:active {
-  background: var(--accent-hover);
+.allegro-add-btn:active,
+.btn.primary.btn-add-to-cart:active,
+form.js-shop-add-cart .btn.primary:active,
+form.product-detail-buy .btn.primary:active,
+form[action*="/cart/add"] .btn.primary:active {
   transform: scale(0.96);
+  filter: brightness(0.98);
   box-shadow: 0 1px 5px rgba(37, 24, 29, 0.12);
 }
 
@@ -563,7 +602,11 @@ body {
 .riff-add-btn:focus-visible,
 .harmony-add-btn:focus-visible,
 .melody-add-btn:focus-visible,
-.allegro-add-btn:focus-visible {
+.allegro-add-btn:focus-visible,
+.btn.primary.btn-add-to-cart:focus-visible,
+form.js-shop-add-cart .btn.primary:focus-visible,
+form.product-detail-buy .btn.primary:focus-visible,
+form[action*="/cart/add"] .btn.primary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -2177,22 +2220,37 @@ body.page-checkout-success .main {
   transform: translate3d(calc(var(--ll-mx) * 0.35), calc(var(--ll-my) * 0.35), 0) scale(0.98);
 }
 
-/* Pill add-to-cart (product detail, grids) — 20% smaller than default .btn.primary */
-.btn.primary.btn-add-to-cart,
-form.js-shop-add-cart .btn.primary,
-form.product-detail-buy .btn.primary,
-form[action*="/cart/add"] .btn.primary {
-  font-size: var(--atc-pill-font);
-  padding: var(--atc-pill-padding-y) var(--atc-pill-padding-x);
-}
-
+/* Pill add-to-cart uses vinyl label sizing (see circle block above) */
 @media (pointer: coarse) {
   .btn.primary.btn-add-to-cart,
   form.js-shop-add-cart .btn.primary,
   form.product-detail-buy .btn.primary,
   form[action*="/cart/add"] .btn.primary {
-    min-height: var(--atc-pill-min-height-touch);
+    min-width: var(--atc-circle-size);
+    min-height: var(--atc-circle-size);
   }
+}
+
+/* Keep vinyl label visible after generic .btn.primary rules */
+.btn.primary.btn-add-to-cart,
+form.js-shop-add-cart .btn.primary,
+form.product-detail-buy .btn.primary,
+form[action*="/cart/add"] .btn.primary {
+  background-color: transparent;
+  background-image: var(--atc-label-image);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  border: none;
+  border-radius: 50%;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  padding: 0;
+  width: var(--atc-circle-size);
+  height: var(--atc-circle-size);
+  min-width: var(--atc-circle-size);
+  min-height: var(--atc-circle-size);
 }
 
 .btn:not(.primary) {
@@ -5832,9 +5890,12 @@ html.lenis body {
 .riff-add-btn,
 .harmony-add-btn,
 .melody-add-btn,
-.allegro-add-btn {
+.allegro-add-btn,
+.btn.primary.btn-add-to-cart,
+form.js-shop-add-cart .btn.primary,
+form.product-detail-buy .btn.primary,
+form[action*="/cart/add"] .btn.primary {
   transition:
-    background 0.4s var(--ll-ease-soft),
     transform 0.5s var(--ll-ease-spring),
     box-shadow 0.55s var(--ll-ease-soft),
     filter 0.4s ease !important;
@@ -5844,7 +5905,11 @@ html.lenis body {
 .riff-add-btn:hover,
 .harmony-add-btn:hover,
 .melody-add-btn:hover,
-.allegro-add-btn:hover {
+.allegro-add-btn:hover,
+.btn.primary.btn-add-to-cart:hover,
+form.js-shop-add-cart .btn.primary:hover,
+form.product-detail-buy .btn.primary:hover,
+form[action*="/cart/add"] .btn.primary:hover {
   filter: brightness(1.05);
 }
 
