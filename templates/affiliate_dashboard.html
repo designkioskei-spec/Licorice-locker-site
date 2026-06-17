@@ -167,6 +167,26 @@
   </div>
 </section>
 
+<section class="panel affiliate-bank-details-panel" id="affiliate-bank-details">
+  <h2>Payout bank details</h2>
+  <p class="muted small affiliate-bank-details-lede">
+    Add the account our accountant should pay your commissions into. Only Licorice Locker admins can see this — it is not shown on your public Listening Room.
+  </p>
+  <form method="post" action="{{ url_for('affiliate_bank_details_save') }}" class="form-stack affiliate-bank-details-form">
+    <label for="affiliate-bank-details-input">Bank account details
+      <textarea
+        id="affiliate-bank-details-input"
+        name="affiliate_bank_details"
+        rows="6"
+        maxlength="2000"
+        placeholder="Account name&#10;Bank name&#10;Account number&#10;Branch / routing / SWIFT (if needed)&#10;Payment reference (optional)"
+      >{{ current_user.affiliate_bank_details or '' }}</textarea>
+    </label>
+    <p class="muted small">Paste everything your accountant needs in one block — copy and pay, no extra steps.</p>
+    <button type="submit" class="btn primary">Save bank details</button>
+  </form>
+</section>
+
 <section class="panel creative-library-panel">
   <h2>Creative library</h2>
   <p class="muted small">Curated photos and videos from Licorice Locker for your social channels. Download and use in your posts.</p>

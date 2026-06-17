@@ -555,6 +555,10 @@ def _migrate_affiliate_profile_columns(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE users ADD COLUMN signup_last_name TEXT")
     if "affiliate_country" not in cols:
         db.execute("ALTER TABLE users ADD COLUMN affiliate_country TEXT NOT NULL DEFAULT ''")
+    if "affiliate_bank_details" not in cols:
+        db.execute("ALTER TABLE users ADD COLUMN affiliate_bank_details TEXT NOT NULL DEFAULT ''")
+    if "affiliate_bank_details_updated_at" not in cols:
+        db.execute("ALTER TABLE users ADD COLUMN affiliate_bank_details_updated_at TEXT")
     db.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_users_affiliate_code
@@ -1503,6 +1507,43 @@ def verify_affiliate_page_profile_saved(
     got = ((stored_dp or "").strip() or None)
     if want != got:
         raise PersistVerificationError("display_picture_url")
+
+
+def verify_affiliate_bank_details_saved(
+    db: sqlite3.Connection,
+    user_id: int,
+    bank_details: str,
+) -> None:
+    uid = int(user_id)
+    row = db.execute(
+        "SELECT affiliate_bank_details FROM users WHERE id = ?",
+        (uid,),
+    ).fetchone()
+    if not row:
+        raise PersistVerificationError("missing_row")
+    if _norm_text(row["affiliate_bank_details"]) != _norm_text(bank_details):
+        raise PersistVerificationError("affiliate_bank_details")
+
+
+def mark_affiliate_commission_paid(
+    db: sqlite3.Connection,
+    affiliate_user_id: int,
+    year_month: str,
+) -> bool:
+    """Set payout_status to paid for one affiliate/month. Returns True if a row was updated."""
+    ym = (year_month or "").strip()
+    if not ym:
+        return False
+    cur = db.execute(
+        """
+        UPDATE commissions
+        SET payout_status = 'paid'
+        WHERE affiliate_user_id = ? AND year_month = ?
+          AND LOWER(TRIM(payout_status)) != 'paid'
+        """,
+        (int(affiliate_user_id), ym),
+    )
+    return cur.rowcount > 0
 
 
 def list_fellow_affiliates_for_dashboard(db: sqlite3.Connection, exclude_user_id: int) -> List[sqlite3.Row]:

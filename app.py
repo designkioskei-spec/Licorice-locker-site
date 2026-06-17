@@ -589,6 +589,11 @@ class User(UserMixin):
         self.affiliate_country = (
             (row["affiliate_country"] or "").strip() if "affiliate_country" in row.keys() else ""
         )
+        self.affiliate_bank_details = (
+            (row["affiliate_bank_details"] or "").strip()
+            if "affiliate_bank_details" in row.keys()
+            else ""
+        )
 
 
 @login_manager.user_loader
@@ -2690,6 +2695,91 @@ def affiliate_dashboard():
     )
 
 
+@app.route("/dashboard/affiliate/bank-details", methods=["POST"])
+@login_required
+def affiliate_bank_details_save():
+    if _user_is_effective_admin():
+        return redirect(url_for("admin_dashboard"))
+    if current_user.role != "affiliate":
+        return redirect(url_for("admin_dashboard"))
+    uid = current_user.id
+    bank_details = (request.form.get("affiliate_bank_details") or "").strip()[:2000]
+    try:
+        with database.get_db() as conn:
+            tr = conn.execute(
+                "SELECT terms_accepted, terms_accepted_at FROM users WHERE id = ?",
+                (uid,),
+            ).fetchone()
+            terms_ok = (
+                int(tr["terms_accepted"] or 0) == 1
+                if tr and "terms_accepted" in tr.keys()
+                else bool(tr["terms_accepted_at"] if tr else None)
+            )
+            if not terms_ok:
+                flash("Accept the Listening Room terms before saving bank details.", "error")
+                return redirect(url_for("affiliate_dashboard"))
+            conn.execute(
+                """
+                UPDATE users
+                SET affiliate_bank_details = ?, affiliate_bank_details_updated_at = datetime('now')
+                WHERE id = ?
+                """,
+                (bank_details, uid),
+            )
+            database.verify_affiliate_bank_details_saved(conn, uid, bank_details)
+    except database.PersistVerificationError as exc:
+        app.logger.error(
+            "affiliate_bank_details persist_verification_failed user_id=%s detail=%s",
+            uid,
+            exc,
+        )
+        flash("Could not save bank details. Please try again.", "error")
+        return redirect(url_for("affiliate_dashboard"))
+    flash("Bank details saved. Our accountant uses these for commission payouts.", "ok")
+    return redirect(url_for("affiliate_dashboard"))
+
+
+@app.route("/dashboard/admin/mark-affiliate-paid", methods=["POST"])
+@login_required
+def admin_mark_affiliate_paid():
+    if not _user_is_effective_admin():
+        return redirect(url_for("affiliate_dashboard"))
+    search_q = (request.form.get("search_q") or "").strip()
+    sa_q = (request.form.get("sa_q") or "").strip()
+    try:
+        affiliate_user_id = int(request.form.get("affiliate_user_id") or 0)
+    except (TypeError, ValueError):
+        affiliate_user_id = 0
+    year_month = (request.form.get("year_month") or "").strip()
+    if not affiliate_user_id or len(year_month) != 7 or year_month[4] != "-":
+        flash("Could not mark payout — invalid request.", "error")
+        return redirect(_url_admin_dashboard_preserve(search_q, sa_q))
+    try:
+        y_str, m_str = year_month.split("-", 1)
+        year, month = int(y_str), int(m_str)
+        if month < 1 or month > 12:
+            raise ValueError("month")
+    except (TypeError, ValueError):
+        flash("Could not mark payout — invalid month.", "error")
+        return redirect(_url_admin_dashboard_preserve(search_q, sa_q))
+    with database.get_db() as conn:
+        aff = conn.execute(
+            "SELECT id, full_name, affiliate_code FROM users WHERE id = ? AND role = 'affiliate'",
+            (affiliate_user_id,),
+        ).fetchone()
+        if not aff:
+            flash("That affiliate was not found.", "error")
+            return redirect(_url_admin_dashboard_preserve(search_q, sa_q))
+        refresh_commission_snapshot(conn, affiliate_user_id, year, month)
+        updated = database.mark_affiliate_commission_paid(conn, affiliate_user_id, year_month)
+    if updated:
+        name = (aff["full_name"] or aff["affiliate_code"] or "Affiliate").strip()
+        flash(f"Marked {name} as paid for {year_month}.", "ok")
+    else:
+        flash("That payout was already marked paid (or no commission is on file).", "info")
+    return redirect(_url_admin_dashboard_preserve(search_q, sa_q))
+
+
 @app.route("/dashboard/affiliate/delete-account", methods=["POST"])
 @login_required
 def affiliate_delete_account():
@@ -3117,8 +3207,15 @@ def _successful_affiliates_current_month(conn: sqlite3.Connection, search_sa: st
             u.full_name,
             u.affiliate_code,
             u.email,
+            COALESCE(NULLIF(TRIM(u.affiliate_bank_details), ''), '') AS affiliate_bank_details,
             COUNT(o.id) AS sales_this_month,
             COALESCE(SUM(o.affiliate_commission_cents), 0) AS commission_cents_this_month,
+            (
+                SELECT COALESCE(c.commission_cents, 0) + COALESCE(c.bonus_cents, 0)
+                FROM commissions c
+                WHERE c.affiliate_user_id = u.id AND c.year_month = ?
+                LIMIT 1
+            ) AS payable_cents_this_month,
             (SELECT payout_status FROM commissions WHERE affiliate_user_id = u.id AND year_month = ? LIMIT 1) AS payout_status
         FROM users u
         INNER JOIN orders o ON o.affiliate_user_id = u.id AND o.order_type = 'affiliate'
@@ -3126,7 +3223,7 @@ def _successful_affiliates_current_month(conn: sqlite3.Connection, search_sa: st
         WHERE u.role = 'affiliate'
           AND u.affiliate_code IS NOT NULL AND TRIM(u.affiliate_code) != ''
     """
-    params: List[Any] = [ym, start, end]
+    params: List[Any] = [ym, ym, start, end]
     sq = (search_sa or "").strip()
     if sq:
         like = f"%{sq}%"
@@ -3213,6 +3310,7 @@ def admin_dashboard():
         orders=orders,
         successful_affiliates=successful_affiliates,
         successful_month_label=ym_label,
+        successful_month_ym=f"{now.year:04d}-{now.month:02d}",
         affiliates=affiliates,
         creative_assets=creative_assets,
         format_money=database.format_money,

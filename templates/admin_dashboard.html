@@ -147,7 +147,7 @@
   <div class="admin-orders-command-head">
     <div class="admin-orders-command-title">
       <h2 class="admin-orders-h1">Successful affiliates</h2>
-      <p class="muted admin-orders-sub">Listening Room members with at least one referral sale in <strong>{{ successful_month_label }}</strong>.</p>
+      <p class="muted admin-orders-sub">Listening Room members with at least one referral sale in <strong>{{ successful_month_label }}</strong>. Copy bank details to pay each affiliate, then mark paid when done.</p>
     </div>
     <form method="get" action="{{ url_for('admin_dashboard') }}" class="admin-orders-search-form" id="admin-sa-search-form" role="search">
       <input type="hidden" name="q" value="{{ search_q }}">
@@ -169,25 +169,52 @@
       <thead>
         <tr>
           <th scope="col">Name / code</th>
+          <th scope="col">Email</th>
+          <th scope="col">Bank details</th>
           <th scope="col" class="admin-orders-num">Sales (month)</th>
-          <th scope="col">Commission (month)</th>
+          <th scope="col">Payable (month)</th>
           <th scope="col">Payout</th>
         </tr>
       </thead>
       <tbody>
         {% for s in successful_affiliates %}
+        {% set bank = (s.affiliate_bank_details or '')|trim %}
+        {% set payable = (s.payable_cents_this_month or 0)|int %}
+        {% set is_paid = (s.payout_status or '') == 'paid' %}
         <tr class="admin-order-row admin-sa-click-row" data-href="{{ admin_affiliate_orders_url(s.affiliate_code, search_q, sa_q) }}">
           <td>
             <span class="admin-sa-name">{{ s.full_name or '—' }}</span>
             {% if s.affiliate_code %}<span class="muted"> · <code>{{ s.affiliate_code }}</code></span>{% endif %}
           </td>
+          <td><a href="mailto:{{ s.email|e }}" class="admin-sa-email">{{ s.email }}</a></td>
+          <td class="admin-sa-bank-cell">
+            {% if bank %}
+            <div class="admin-bank-details-wrap">
+              <pre class="admin-bank-details-text" id="admin-bank-{{ s.id }}">{{ bank }}</pre>
+              <button type="button" class="btn admin-bank-copy-btn" data-copy-target="admin-bank-{{ s.id }}">Copy</button>
+            </div>
+            {% else %}
+            <span class="admin-bank-missing muted">Not provided yet</span>
+            {% endif %}
+          </td>
           <td class="admin-orders-num">{{ s.sales_this_month }}</td>
-          <td>{{ format_money(s.commission_cents_this_month|int) }}</td>
-          <td><span class="admin-payout-badge {% if (s.payout_status or '') == 'paid' %}admin-payout-paid{% else %}admin-payout-pending{% endif %}">{{ 'Paid' if (s.payout_status or '') == 'paid' else 'Not paid' }}</span></td>
+          <td>{{ format_money(payable if payable else (s.commission_cents_this_month|int)) }}</td>
+          <td class="admin-sa-payout-cell">
+            <span class="admin-payout-badge {% if is_paid %}admin-payout-paid{% else %}admin-payout-pending{% endif %}">{{ 'Paid' if is_paid else 'Not paid' }}</span>
+            {% if not is_paid and payable > 0 %}
+            <form method="post" action="{{ url_for('admin_mark_affiliate_paid') }}" class="admin-mark-paid-form">
+              <input type="hidden" name="affiliate_user_id" value="{{ s.id }}">
+              <input type="hidden" name="year_month" value="{{ successful_month_ym }}">
+              <input type="hidden" name="search_q" value="{{ search_q }}">
+              <input type="hidden" name="sa_q" value="{{ sa_q }}">
+              <button type="submit" class="btn primary admin-mark-paid-btn">Mark paid</button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="4" class="admin-orders-empty">{% if sa_q %}No members match your search.{% else %}No referral sales this month yet.{% endif %}</td>
+          <td colspan="6" class="admin-orders-empty">{% if sa_q %}No members match your search.{% else %}No referral sales this month yet.{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -542,9 +569,33 @@ setInterval(() => {
 document.querySelectorAll('.admin-sa-click-row[data-href]').forEach(function (tr) {
   tr.style.cursor = 'pointer';
   tr.addEventListener('click', function (e) {
-    if (e.target.closest('a, button, input, select, label')) return;
+    if (e.target.closest('a, button, input, select, label, textarea, pre, form')) return;
     var href = tr.getAttribute('data-href');
     if (href) window.location.href = href;
+  });
+});
+
+document.querySelectorAll('.admin-bank-copy-btn[data-copy-target]').forEach(function (btn) {
+  btn.addEventListener('click', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var id = btn.getAttribute('data-copy-target');
+    var el = id ? document.getElementById(id) : null;
+    var text = el ? (el.textContent || '').trim() : '';
+    if (!text) return;
+    var label = btn.textContent;
+    function done() {
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = label; }, 1800);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () {
+        window.prompt('Copy bank details:', text);
+      });
+    } else {
+      window.prompt('Copy bank details:', text);
+      done();
+    }
   });
 });
 </script>
