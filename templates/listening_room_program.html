@@ -1,13 +1,16 @@
 {% extends "base.html" %}
 {% block title %}The Listening Room — Licorice Locker{% endblock %}
 {% block body_class %}listening-room-program{% endblock %}
+{% block head %}
+<script src="{{ url_for('static', filename='feature-flags.js') }}"></script>
+{% endblock %}
 {% block content %}
 
 <!-- HERO — hook (money + identity) -->
 <section class="lr-hero" aria-labelledby="lr-hero-title">
   <div class="lr-hero-inner">
     <p class="lr-eyebrow">Licorice Locker · The Listening Room</p>
-    <h1 id="lr-hero-title" class="lr-display">Earn up to $128 per sale</h1>
+    <h1 id="lr-hero-title" class="lr-display">Earn up to ${{ top_commission_example }} per sale</h1>
     <p class="lr-lede lr-lede--tight">You already have taste.</p>
     <p class="lr-lede lr-lede--tight">Now turn it into income.</p>
     <div class="lr-hero-cta">
@@ -89,7 +92,7 @@
     <p class="lr-prose lr-prose--tight">20% from your first sale in a month</p>
     <p class="lr-prose lr-prose--tight">25% at 10 sales in a month</p>
     <p class="lr-prose lr-prose--tight">30% at 25 sales in a month</p>
-    <p class="lr-prose"><strong>Top partners earn up to $128 per sale</strong> (Sound Wave at top tier).</p>
+    <p class="lr-prose"><strong>Top partners earn up to ${{ top_commission_example }} per sale</strong> ({{ top_product_label }} at top tier).</p>
     <p class="lr-section-cta">
       <a class="btn primary lr-btn-primary" href="#play-your-part">Try the calculator</a>
     </p>
@@ -107,7 +110,11 @@
         There are also <strong>room bonuses</strong> when you hit 10 and 25 spins in the same month — because momentum should feel real.
       </p>
       <p class="lr-prose muted small">
+        {% if soundwave_enabled %}
         Figures are estimates in NZD using list prices; your mix of Sound Wave and Mini Series pieces will vary.
+        {% else %}
+        Figures are estimates in NZD using Mini Series list prices; your mix of pieces will vary.
+        {% endif %}
         That’s just a few posts, a couple of DMs, one honest story — <strong>on repeat</strong>.
       </p>
       <p class="lr-section-cta">
@@ -119,6 +126,7 @@
       id="lr-calc-root"
       data-soundwave-cents="{{ soundwave_cents }}"
       data-mini-cents="{{ mini_cents }}"
+      data-soundwave-enabled="{{ '1' if soundwave_enabled else '0' }}"
     >
       <p class="lr-calc-label" id="lr-calc-spins-label">0 spins this month</p>
       <div class="lr-calc-output" aria-live="polite">
@@ -134,18 +142,22 @@
       <input type="range" class="lr-calc-slider" id="lr-calc-slider" min="0" max="50" value="5" step="1" aria-valuemin="0" aria-valuemax="50">
       <fieldset class="lr-calc-modes">
         <legend class="sr-only">What are you mostly moving?</legend>
+        {% if soundwave_enabled %}
         <label class="lr-calc-mode">
           <input type="radio" name="lr-product-mode" value="soundwave" checked>
           <span>Sound Wave</span>
         </label>
+        {% endif %}
         <label class="lr-calc-mode">
-          <input type="radio" name="lr-product-mode" value="mini">
+          <input type="radio" name="lr-product-mode" value="mini"{% if not soundwave_enabled %} checked{% endif %}>
           <span>Mini series</span>
         </label>
+        {% if soundwave_enabled %}
         <label class="lr-calc-mode">
           <input type="radio" name="lr-product-mode" value="mix">
           <span>50 / 50 mix</span>
         </label>
+        {% endif %}
       </fieldset>
       <div class="lr-calc-detail muted small" id="lr-calc-detail"></div>
     </div>

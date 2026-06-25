@@ -42,6 +42,7 @@ import qrcode
 import stripe
 
 import db as database
+import feature_flags
 from tracking import client_ip_from_request, device_class_from_user_agent, geo_lookup, ip_fingerprint
 
 logger = logging.getLogger(__name__)
@@ -420,6 +421,14 @@ def inject_listening_room_invites() -> Dict[str, Any]:
     return {"listening_room_invites_required": _listening_room_invites_required()}
 
 
+@app.context_processor
+def inject_feature_flags() -> Dict[str, Any]:
+    return {
+        "soundwave_enabled": feature_flags.SOUNDWAVE_ENABLED,
+        "nav_menu_items": _nav_menu_items_visible(),
+    }
+
+
 # Homepage / slide-out menu order (explicit; not DB sort order).
 NAV_MENU_ITEMS: Tuple[Tuple[str, str, str], ...] = (
     ("sound-wave", "Sound Wave", "sound-wave-feature-01.png"),
@@ -430,10 +439,44 @@ NAV_MENU_ITEMS: Tuple[Tuple[str, str, str], ...] = (
 )
 
 
+def _nav_menu_items_visible() -> Tuple[Tuple[str, str, str], ...]:
+    if feature_flags.SOUNDWAVE_ENABLED:
+        return NAV_MENU_ITEMS
+    return tuple(item for item in NAV_MENU_ITEMS if feature_flags.storefront_product_visible(item[0]))
+
+
+def _storefront_filter_products(products: List[sqlite3.Row]) -> List[sqlite3.Row]:
+    if feature_flags.SOUNDWAVE_ENABLED:
+        return products
+    return [p for p in products if feature_flags.storefront_product_visible(p["slug"])]
+
+
+def _sound_wave_from_products(products: List[sqlite3.Row]) -> Optional[sqlite3.Row]:
+    if not feature_flags.SOUNDWAVE_ENABLED:
+        return None
+    return next((p for p in products if p["slug"] == feature_flags.SOUNDWAVE_SLUG), None)
+
+
+def _earnings_display_for_dashboard() -> Dict[str, Dict[str, float]]:
+    if feature_flags.SOUNDWAVE_ENABLED:
+        return EARNINGS_DISPLAY_NZD
+    return {k: v for k, v in EARNINGS_DISPLAY_NZD.items() if k != "Soundwave Display"}
+
+
+def _listening_room_top_commission_example_nzd() -> int:
+    if feature_flags.SOUNDWAVE_ENABLED:
+        return int(LIST_PRICE_SOUNDWAVE_NZD * 0.30)
+    return int(round(LIST_PRICE_MINI_SERIES_NZD * 0.30))
+
+
+def _listening_room_top_product_label() -> str:
+    return "Sound Wave" if feature_flags.SOUNDWAVE_ENABLED else "Mini Series"
+
+
 def _product_success_image_static(slug: Optional[str]) -> str:
     """Static path under static/ for success-page hero (matches checkout line banners)."""
     s = (slug or "").strip().lower()
-    banners = {x[0]: x[2] for x in NAV_MENU_ITEMS}
+    banners = {x[0]: x[2] for x in _nav_menu_items_visible()}
     if s in banners:
         return banners[s]
     if s:
@@ -478,6 +521,8 @@ def _cart_migrate_dict_to_list(d: Dict[str, Any], conn: sqlite3.Connection) -> L
         if not p or not database.product_add_to_cart_enabled(p):
             continue
         slug = str(p["slug"] or "").strip().lower()
+        if not feature_flags.storefront_product_visible(slug):
+            continue
         rows.append(
             {
                 "product_id": pid,
@@ -536,6 +581,10 @@ def _cart_get_list(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
         if not p or not database.product_add_to_cart_enabled(p):
             dropped = True
             continue
+        slug = str(p["slug"] or "").strip().lower()
+        if not feature_flags.storefront_product_visible(slug):
+            dropped = True
+            continue
         try:
             q = max(1, min(999, int(entry.get("quantity", 1))))
         except (TypeError, ValueError):
@@ -561,7 +610,7 @@ def _cart_get_list(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
 @app.context_processor
 def inject_product_checkout_banner() -> Dict[str, Any]:
     """Hero/banner static image per product slug (checkout line thumbnails)."""
-    banners = {s: fn for s, _n, fn in NAV_MENU_ITEMS}
+    banners = {s: fn for s, _n, fn in _nav_menu_items_visible()}
 
     def product_checkout_banner(slug: Optional[str]) -> Optional[str]:
         if not slug:
@@ -1302,7 +1351,7 @@ def affiliate_landing(slug: str):
         if code:
             return redirect(url_for("listening_room", code=code), code=302)
         page = database.affiliate_page(conn, aff["id"])
-        products = database.list_products(conn)
+        products = _storefront_filter_products(database.list_products(conn))
         aff_id = int(aff["id"])
 
     vid = request.cookies.get("licorice_visitor")
@@ -1378,6 +1427,9 @@ def listening_room_program():
         shop_url=url_for("shop"),
         soundwave_cents=int(LIST_PRICE_SOUNDWAVE_NZD * 100),
         mini_cents=int(LIST_PRICE_MINI_SERIES_NZD * 100),
+        soundwave_enabled=feature_flags.SOUNDWAVE_ENABLED,
+        top_commission_example=_listening_room_top_commission_example_nzd(),
+        top_product_label=_listening_room_top_product_label(),
     )
 
 
@@ -1396,14 +1448,14 @@ def listening_room(code: str):
             flash("That Listening Room was not found.", "error")
             return redirect(url_for("shop"))
         page = database.affiliate_page(conn, int(aff["id"]))
-        products = database.list_products(conn)
+        products = _storefront_filter_products(database.list_products(conn))
         aff_id = int(aff["id"])
 
     if not page:
         flash("That Listening Room was not found.", "error")
         return redirect(url_for("shop"))
 
-    sound_wave_product = next((p for p in products if p["slug"] == "sound-wave"), None)
+    sound_wave_product = _sound_wave_from_products(products)
     riff_product = next((p for p in products if p["slug"] == "riff"), None)
     harmony_product = next((p for p in products if p["slug"] == "harmony"), None)
     melody_product = next((p for p in products if p["slug"] == "melody"), None)
@@ -1456,6 +1508,8 @@ def listening_room(code: str):
 
 @app.route("/product/<slug>")
 def product_detail(slug: str):
+    if feature_flags.is_soundwave_slug(slug) and not feature_flags.SOUNDWAVE_ENABLED:
+        return redirect(url_for("shop"), code=302)
     with database.get_db() as conn:
         product = database.product_by_slug(conn, slug)
         if not product:
@@ -1482,8 +1536,8 @@ def shop():
         return redirect(url_for("shop"), code=303)
 
     with database.get_db() as conn:
-        products = database.list_products(conn)
-    sound_wave_product = next((p for p in products if p["slug"] == "sound-wave"), None)
+        products = _storefront_filter_products(database.list_products(conn))
+    sound_wave_product = _sound_wave_from_products(products)
     riff_product = next((p for p in products if p["slug"] == "riff"), None)
     harmony_product = next((p for p in products if p["slug"] == "harmony"), None)
     melody_product = next((p for p in products if p["slug"] == "melody"), None)
@@ -1704,6 +1758,12 @@ def cart_add():
         p = database.product_by_id(conn, pid)
     if not p or not database.product_add_to_cart_enabled(p):
         msg = "This product is not available for purchase."
+        if wants_json:
+            return jsonify({"ok": False, "message": msg}), 400
+        flash(msg, "error")
+        return redirect(request.referrer or url_for("shop"))
+    if feature_flags.is_soundwave_slug(str(p["slug"] or "")) and not feature_flags.SOUNDWAVE_ENABLED:
+        msg = "This product is not available at the moment."
         if wants_json:
             return jsonify({"ok": False, "message": msg}), 400
         flash(msg, "error")
@@ -2689,7 +2749,7 @@ def affiliate_dashboard():
         tiers=COMMISSION_TIERS,
         format_money=database.format_money,
         creative_assets=creative_assets,
-        earnings_display=EARNINGS_DISPLAY_NZD,
+        earnings_display=_earnings_display_for_dashboard(),
         affiliate_pending_payout=affiliate_pending_payout,
         fellow_affiliates=fellow_affiliates,
     )

@@ -8,6 +8,10 @@
 
   var SW = parseInt(root.getAttribute("data-soundwave-cents") || "42900", 10);
   var MINI = parseInt(root.getAttribute("data-mini-cents") || "14300", 10);
+  var soundwaveEnabled =
+    typeof SOUNDWAVE_ENABLED !== "undefined"
+      ? SOUNDWAVE_ENABLED
+      : root.getAttribute("data-soundwave-enabled") === "1";
 
   var slider = document.getElementById("lr-calc-slider");
   var input = document.getElementById("lr-calc-input");
@@ -30,7 +34,7 @@
   }
 
   function priceForSaleIndex(mode, i) {
-    if (mode === "mini") return MINI;
+    if (!soundwaveEnabled || mode === "mini") return MINI;
     if (mode === "mix") return i % 2 === 1 ? SW : MINI;
     return SW;
   }
@@ -64,7 +68,9 @@
 
   function currentMode() {
     var r = root.querySelector('input[name="lr-product-mode"]:checked');
-    return r ? r.value : "soundwave";
+    var mode = r ? r.value : soundwaveEnabled ? "soundwave" : "mini";
+    if (!soundwaveEnabled && (mode === "soundwave" || mode === "mix")) return "mini";
+    return mode;
   }
 
   function updateModeStyles() {

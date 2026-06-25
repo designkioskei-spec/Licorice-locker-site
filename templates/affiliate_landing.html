@@ -49,7 +49,7 @@
 <div class="product-grid">
   {% for p in products %}
   <article class="product-card {% if p.is_main %}product-main{% endif %}" data-ll-reveal="{{ 'left' if loop.index0 % 2 == 0 else 'right' }}" data-ll-reveal-delay="{{ loop.index0 * 24 }}">
-    {% if p.is_main %}<span class="badge">Main — Sound Wave</span>{% endif %}
+    {% if p.is_main and soundwave_enabled %}<span class="badge">Main — Sound Wave</span>{% endif %}
     <h3><a class="product-card-title-link" href="{{ url_for('product_detail', slug=p.slug) }}">{{ p.name }}</a></h3>
     <p class="price"><span data-nzd-cents="{{ p.price_cents }}">{{ format_money(p.price_cents) }}</span></p>
     {% set _desc = p.description or '' %}
