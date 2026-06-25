@@ -37,8 +37,6 @@ from flask_login import LoginManager, UserMixin, current_user, login_required, l
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
-import pyotp
-import qrcode
 import stripe
 
 import db as database
@@ -694,36 +692,21 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-AFFILIATE_2FA_PENDING_KEY = "affiliate_2fa_pending"
-AFFILIATE_2FA_TTL_SEC = 600
+def _complete_affiliate_login(row: sqlite3.Row):
+    """Create Flask-Login session after email + password validation."""
+    uid = int(row["id"])
+    logger.info(
+        "affiliate_login_success user_id=%s normalized_email=%s",
+        uid,
+        database.normalize_email(row["email"] or ""),
+    )
+    login_user(User(row), remember=True)
+    return jsonify({"ok": True, "redirect": url_for("affiliate_dashboard")})
 
 
-def _totp_provisioning_qr_data_url(secret: str, email: str) -> str:
-    totp = pyotp.TOTP(secret)
-    uri = totp.provisioning_uri(name=email, issuer_name="Licorice Locker")
-    img = qrcode.make(uri)
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
-
-
-def _clear_affiliate_2fa_session() -> None:
-    session.pop(AFFILIATE_2FA_PENDING_KEY, None)
-
-
-def _affiliate_2fa_pending_valid() -> Optional[Dict[str, Any]]:
-    data = session.get(AFFILIATE_2FA_PENDING_KEY)
-    if not data or not isinstance(data, dict):
-        return None
-    uid = data.get("uid")
-    exp = data.get("exp")
-    if uid is None or exp is None:
-        _clear_affiliate_2fa_session()
-        return None
-    if time.time() > float(exp):
-        _clear_affiliate_2fa_session()
-        return None
-    return data
+def _affiliate_step1_json_after_password_ok(conn: sqlite3.Connection, row: sqlite3.Row, email: str):
+    fresh = database.user_by_id(conn, int(row["id"])) or row
+    return _complete_affiliate_login(fresh)
 
 
 def _parse_iso_datetime(raw: Optional[str]) -> Optional[datetime]:
@@ -804,32 +787,6 @@ def _refetch_affiliate_user_after_race(conn: sqlite3.Connection, email: str) -> 
             return row
         time.sleep(0.02)
     return None
-
-
-def _affiliate_step1_json_after_password_ok(conn: sqlite3.Connection, row: sqlite3.Row, email: str):
-    uid = int(row["id"])
-    exp = time.time() + AFFILIATE_2FA_TTL_SEC
-    totp_secret = row["totp_secret"]
-    totp_confirmed = bool(row["totp_confirmed"])
-    if not totp_confirmed:
-        if not totp_secret:
-            totp_secret = pyotp.random_base32()
-            database.set_user_totp_secret(conn, uid, totp_secret)
-        qr = _totp_provisioning_qr_data_url(totp_secret, email)
-        session[AFFILIATE_2FA_PENDING_KEY] = {"uid": uid, "exp": exp, "mode": "setup"}
-        logger.info(
-            "affiliate_step1 login_success step=totp_setup user_id=%s normalized_email=%s",
-            uid,
-            email,
-        )
-        return jsonify({"ok": True, "step": "setup", "qr": qr})
-    session[AFFILIATE_2FA_PENDING_KEY] = {"uid": uid, "exp": exp, "mode": "verify"}
-    logger.info(
-        "affiliate_step1 login_success step=totp_verify user_id=%s normalized_email=%s",
-        uid,
-        email,
-    )
-    return jsonify({"ok": True, "step": "verify"})
 
 
 def affiliate_orders_in_month(
@@ -960,7 +917,7 @@ def affiliate_login():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    """Staff (admin) sign-in only. Members use the footer Listening Room modal + two-factor auth."""
+    """Staff (admin) sign-in only. Members use the footer Listening Room modal (email + password)."""
     if current_user.is_authenticated:
         return redirect(_dashboard_for_role())
     if request.method == "POST":
@@ -1089,7 +1046,7 @@ def auth_affiliate_signup():
 
 @app.route("/auth/affiliate/step1", methods=["POST"])
 def auth_affiliate_step1():
-    """Listening Room: existing user → password → 2FA; new user → create → same 2FA flow (no dead ends)."""
+    """Listening Room: email + password → session → affiliate dashboard."""
     data = request.get_json(force=True, silent=True) or {}
     email = database.normalize_email(data.get("email") or "")
     password = data.get("password") or ""
@@ -1203,48 +1160,6 @@ def auth_affiliate_step1():
         return _affiliate_step1_json_after_password_ok(conn, user, email)
 
 
-@app.route("/auth/affiliate/step2", methods=["POST"])
-def auth_affiliate_step2():
-    """Verify TOTP code; complete Listening Room sign-in (and confirm device on first setup)."""
-    data = request.get_json(silent=True) or {}
-    code = (data.get("code") or "").replace(" ", "").strip()
-    if not code or len(code) < 6:
-        return jsonify({"ok": False, "error": "invalid_code"}), 400
-    pending = _affiliate_2fa_pending_valid()
-    if not pending:
-        return jsonify({"ok": False, "error": "session_expired"}), 401
-    uid = int(pending["uid"])
-    mode = pending.get("mode", "verify")
-    with database.get_db() as conn:
-        row = database.user_by_id(conn, uid)
-        if not row or row["role"] != "affiliate":
-            _clear_affiliate_2fa_session()
-            return jsonify({"ok": False, "error": "invalid"}), 400
-        secret = row["totp_secret"]
-    if not secret:
-        return jsonify({"ok": False, "error": "invalid"}), 400
-    totp = pyotp.TOTP(secret)
-    if not totp.verify(code, valid_window=1):
-        return jsonify({"ok": False, "error": "invalid_code"}), 400
-    try:
-        with database.get_db() as conn:
-            if mode == "setup":
-                database.confirm_user_totp(conn, uid)
-                chk = conn.execute("SELECT totp_confirmed FROM users WHERE id = ?", (uid,)).fetchone()
-                if not chk or int(chk["totp_confirmed"] or 0) != 1:
-                    raise database.PersistVerificationError("totp_confirm_not_persisted")
-            row = database.user_by_id(conn, uid)
-    except database.PersistVerificationError:
-        logger.error("auth_affiliate_step2 totp persist verification failed user_id=%s", uid)
-        return jsonify({"ok": False, "error": "persist_failed"}), 500
-    if not row:
-        _clear_affiliate_2fa_session()
-        return jsonify({"ok": False, "error": "invalid"}), 400
-    login_user(User(row), remember=True)
-    _clear_affiliate_2fa_session()
-    return jsonify({"ok": True, "redirect": url_for("affiliate_dashboard")})
-
-
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
@@ -1289,7 +1204,7 @@ def reset_password(token: str):
             database.set_user_password_hash(conn, uid, h)
             database.clear_password_reset(conn, uid)
             database.clear_user_totp(conn, uid)
-        flash("Your password was updated. Use Listening Room sign in in the footer — you will set up 2FA again on first login.", "ok")
+        flash("Your password was updated. Sign in with Listening Room sign in in the footer.", "ok")
         return redirect(url_for("shop", open_affiliate_login="1"))
     return render_template("reset_password.html", token=token)
 
@@ -3826,7 +3741,7 @@ def init_db_command():
 @click.option(
     "--reset-password",
     is_flag=True,
-    help="If an affiliate already exists for this email, set password and reset 2FA (use only on the server).",
+    help="If an affiliate already exists for this email, set a new password (use only on the server).",
 )
 def create_listening_room_user(
     email: str, password: str, first_name: str, last_name: str, reset_password: bool
@@ -3863,13 +3778,12 @@ def create_listening_room_user(
                 database.set_user_password_hash(conn, uid, pw_hash)
                 database.clear_user_totp(conn, uid)
                 click.echo(
-                    f"OK: Updated password and cleared 2FA for affiliate id={uid} normalized_email={norm}. "
-                    "Next sign-in will show a new authenticator QR."
+                    f"OK: Updated password for affiliate id={uid} normalized_email={norm}."
                 )
                 return
             click.echo(
                 f"OK: Listening Room affiliate already exists (id={int(row['id'])}, normalized_email={norm}). "
-                "No changes. Use --reset-password to set a new password and reset 2FA."
+                "No changes. Use --reset-password to set a new password."
             )
             return
         uid = database.create_affiliate_signup(conn, norm, pw_hash, first_name, last_name)

@@ -1352,17 +1352,6 @@ def create_affiliate_signup(
     raise RuntimeError("Could not allocate a unique affiliate code")
 
 
-def set_user_totp_secret(db: sqlite3.Connection, user_id: int, secret: str) -> None:
-    db.execute(
-        "UPDATE users SET totp_secret = ?, totp_confirmed = 0 WHERE id = ?",
-        (secret, user_id),
-    )
-
-
-def confirm_user_totp(db: sqlite3.Connection, user_id: int) -> None:
-    db.execute("UPDATE users SET totp_confirmed = 1 WHERE id = ?", (user_id,))
-
-
 def set_password_reset(db: sqlite3.Connection, user_id: int, token: str, expires_iso: str) -> None:
     db.execute(
         "UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?",
@@ -1389,6 +1378,7 @@ def set_user_password_hash(db: sqlite3.Connection, user_id: int, password_hash: 
 
 
 def clear_user_totp(db: sqlite3.Connection, user_id: int) -> None:
+    """Clear legacy TOTP columns (affiliate 2FA removed; kept for password-reset hygiene)."""
     db.execute("UPDATE users SET totp_secret = NULL, totp_confirmed = 0 WHERE id = ?", (user_id,))
 
 
