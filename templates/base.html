@@ -85,7 +85,6 @@
         </a>
         {% endfor %}
       </nav>
-      {% if auth_required %}
       {% if current_user.is_authenticated %}
       <div class="slide-menu-auth" aria-label="Listening Room account">
         {% if user_is_effective_admin() %}
@@ -94,14 +93,6 @@
         {% else %}
           <a class="slide-menu-link" href="{{ url_for('affiliate_dashboard') }}">Your Listening Room</a>
           <a class="slide-menu-link slide-menu-link--subtle" href="{{ url_for('logout') }}">Log out</a>
-        {% endif %}
-      </div>
-      {% endif %}
-      {% else %}
-      <div class="slide-menu-auth" aria-label="Member tools">
-        <a class="slide-menu-link" href="{{ url_for('affiliate_dashboard') }}">Your Listening Room</a>
-        {% if can_access_admin_ui() %}
-        <a class="slide-menu-link" href="{{ url_for('admin_dashboard') }}">Admin</a>
         {% endif %}
       </div>
       {% endif %}
@@ -183,7 +174,7 @@
         <div class="site-footer-logo">
           <img src="{{ url_for('static', filename='logo.png') }}" alt="Licorice Locker" width="180" height="44" decoding="async">
         </div>
-        {% if auth_required and not current_user.is_authenticated %}
+        {% if not current_user.is_authenticated %}
         <div class="site-footer-brand-aside">
           <button type="button" class="btn primary site-footer-signin-btn" id="affiliate-login-open-btn" aria-haspopup="dialog" aria-controls="affiliate-login-modal">Sign in</button>
           <p class="site-footer-copy">
@@ -197,7 +188,6 @@
         {% endif %}
       </div>
     </div>
-    {% if auth_required %}
     {% if current_user.is_authenticated and not user_is_effective_admin() %}
     <div class="site-footer-bottom">
       <a href="{{ url_for('affiliate_dashboard') }}" class="site-footer-lr-link site-footer-lr-link--member">Your Listening Room</a>
@@ -210,26 +200,15 @@
       </div>
     </div>
     {% endif %}
-    {% else %}
-    <div class="site-footer-bottom">
-      <div class="site-footer-bottom-links">
-        <a href="{{ url_for('affiliate_dashboard') }}" class="site-footer-lr-link">Your Listening Room</a>
-        {% if can_access_admin_ui() %}
-        <a href="{{ url_for('admin_dashboard') }}" class="site-footer-lr-link">Admin</a>
-        {% endif %}
-        <a href="{{ url_for('listening_room_program') }}" class="site-footer-lr-link">The Listening Room</a>
-      </div>
-    </div>
-    {% endif %}
   </footer>
 
-  {% if auth_required and not current_user.is_authenticated %}
+  {% if not current_user.is_authenticated %}
   <div id="affiliate-login-modal" class="affiliate-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="affiliate-modal-title">
     <div class="affiliate-modal-backdrop" tabindex="-1"></div>
     <div class="affiliate-modal-panel">
       <button type="button" class="affiliate-modal-close" id="affiliate-modal-close" aria-label="Close dialog">&times;</button>
       <h2 id="affiliate-modal-title" class="affiliate-modal-title">Listening Room sign in</h2>
-      <p class="affiliate-modal-lede">Enter your email and password. First time here creates your account — then enter the code from your authenticator app.</p>
+      <p class="affiliate-modal-lede">Enter your email and password. First time here creates your account, then takes you straight to your dashboard.</p>
       <div id="affiliate-login-error" class="affiliate-modal-error" role="alert" hidden></div>
 
       <div id="affiliate-step-credentials" class="affiliate-modal-step">
@@ -242,23 +221,9 @@
             <span class="affiliate-field-label">Password</span>
             <input type="password" name="password" id="affiliate-password" required autocomplete="current-password" placeholder="Enter your password">
           </label>
-          <button type="submit" class="btn primary affiliate-modal-primary" id="affiliate-credentials-submit">Continue</button>
+          <button type="submit" class="btn primary affiliate-modal-primary" id="affiliate-credentials-submit">Sign in</button>
         </form>
         <p class="affiliate-modal-forgot"><a href="{{ url_for('forgot_password') }}" id="affiliate-forgot-link">Forgot password?</a></p>
-      </div>
-
-      <div id="affiliate-step-2fa" class="affiliate-modal-step affiliate-modal-step--2fa" hidden>
-        <p id="affiliate-2fa-setup-hint" class="affiliate-modal-hint" hidden>Scan the QR with your authenticator app, then enter the 6-digit code.</p>
-        <p id="affiliate-2fa-verify-hint" class="affiliate-modal-hint" hidden>Enter the 6-digit code from your authenticator app.</p>
-        <div class="affiliate-modal-qr-wrap">
-          <img id="affiliate-totp-qr" alt="" class="affiliate-modal-qr" width="200" height="200" hidden decoding="async">
-        </div>
-        <label class="affiliate-field">
-          <span class="affiliate-field-label">Authentication code</span>
-          <input type="text" name="code" id="affiliate-totp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="000000">
-        </label>
-        <button type="button" class="btn primary affiliate-modal-primary" id="affiliate-2fa-submit">Sign in</button>
-        <p class="affiliate-modal-back"><button type="button" class="affiliate-modal-text-btn" id="affiliate-back-credentials">← Back</button></p>
       </div>
     </div>
   </div>
@@ -268,7 +233,7 @@
     <div class="affiliate-modal-panel">
       <button type="button" class="affiliate-modal-close" id="affiliate-signup-modal-close" aria-label="Close dialog">&times;</button>
       <h2 id="affiliate-signup-modal-title" class="affiliate-modal-title">Earn up to $128 per sale</h2>
-      <p class="affiliate-modal-lede">Start at 20% commission from your first sale. Hit 10 sales to unlock 25%; hit 25 to unlock 30%. No inventory, no customer service — we handle everything. Built for creators with taste. Create your account below; you will set up two-factor authentication the first time you sign in.</p>
+      <p class="affiliate-modal-lede">Start at 20% commission from your first sale. Hit 10 sales to unlock 25%; hit 25 to unlock 30%. No inventory, no customer service — we handle everything. Built for creators with taste. Create your account below, then sign in with email and password anytime.</p>
       <div id="affiliate-signup-error" class="affiliate-modal-error" role="alert" hidden></div>
       <form id="affiliate-form-signup" class="affiliate-modal-form" method="post" action="{{ url_for('auth_affiliate_signup') }}" novalidate>
         <label class="affiliate-field">
@@ -299,24 +264,14 @@
   (function () {
     var listeningRoomInvitesRequired = {{ listening_room_invites_required | tojson }};
     var step1Url = {{ url_for('auth_affiliate_step1') | tojson }};
-    var step2Url = {{ url_for('auth_affiliate_step2') | tojson }};
     var modal = document.getElementById("affiliate-login-modal");
     var openBtn = document.getElementById("affiliate-login-open-btn");
     var closeBtn = document.getElementById("affiliate-modal-close");
     var backdrop = modal && modal.querySelector(".affiliate-modal-backdrop");
-    var stepCred = document.getElementById("affiliate-step-credentials");
-    var step2fa = document.getElementById("affiliate-step-2fa");
     var formCred = document.getElementById("affiliate-form-credentials");
     var errEl = document.getElementById("affiliate-login-error");
-    var qrImg = document.getElementById("affiliate-totp-qr");
-    var hintSetup = document.getElementById("affiliate-2fa-setup-hint");
-    var hintVerify = document.getElementById("affiliate-2fa-verify-hint");
-    var totpInput = document.getElementById("affiliate-totp-code");
     var btnCred = document.getElementById("affiliate-credentials-submit");
     var btnCredDefault = btnCred ? btnCred.textContent : "";
-    var btn2fa = document.getElementById("affiliate-2fa-submit");
-    var btn2faDefault = btn2fa ? btn2fa.textContent : "";
-    var backCred = document.getElementById("affiliate-back-credentials");
     if (!modal || !openBtn) return;
 
     function setError(msg) {
@@ -330,28 +285,9 @@
       }
     }
 
-    function showCredentials() {
-      if (stepCred) stepCred.hidden = false;
-      if (step2fa) step2fa.hidden = true;
-      if (qrImg) { qrImg.hidden = true; qrImg.removeAttribute("src"); }
-      if (hintSetup) hintSetup.hidden = true;
-      if (hintVerify) hintVerify.hidden = true;
-      if (totpInput) totpInput.value = "";
-      if (btnCred) { btnCred.disabled = false; btnCred.textContent = btnCredDefault; }
-      if (btn2fa) { btn2fa.disabled = false; btn2fa.textContent = btn2faDefault; }
+    function resetLoginForm() {
       setError("");
-    }
-
-    function show2fa(step) {
-      if (stepCred) stepCred.hidden = true;
-      if (step2fa) step2fa.hidden = false;
-      var isSetup = step === "setup";
-      if (hintSetup) hintSetup.hidden = !isSetup;
-      if (hintVerify) hintVerify.hidden = isSetup;
-      if (qrImg) qrImg.hidden = !isSetup;
-      if (totpInput) { totpInput.value = ""; totpInput.focus(); }
-      var panel = modal.querySelector(".affiliate-modal-panel");
-      if (panel) panel.scrollTop = 0;
+      if (btnCred) { btnCred.disabled = false; btnCred.textContent = btnCredDefault; }
     }
 
     function openModal() {
@@ -370,7 +306,7 @@
       if (slideMenu) slideMenu.setAttribute("aria-hidden", "true");
       modal.setAttribute("aria-hidden", "false");
       document.body.classList.add("affiliate-modal-open");
-      showCredentials();
+      resetLoginForm();
       var email = document.getElementById("affiliate-email");
       if (email) setTimeout(function () { email.focus(); }, 50);
     }
@@ -378,13 +314,12 @@
     function closeModal() {
       modal.setAttribute("aria-hidden", "true");
       document.body.classList.remove("affiliate-modal-open");
-      showCredentials();
+      resetLoginForm();
     }
 
     openBtn.addEventListener("click", openModal);
     if (closeBtn) closeBtn.addEventListener("click", closeModal);
     if (backdrop) backdrop.addEventListener("click", closeModal);
-    if (backCred) backCred.addEventListener("click", showCredentials);
 
     document.addEventListener("keydown", function (e) {
       if (e.key !== "Escape" || !document.body.classList.contains("affiliate-modal-open")) return;
@@ -406,7 +341,7 @@
         setError("");
         if (btnCred) {
           btnCred.disabled = true;
-          btnCred.textContent = "Checking…";
+          btnCred.textContent = "Signing in…";
         }
         var email = (document.getElementById("affiliate-email") || {}).value || "";
         var password = (document.getElementById("affiliate-password") || {}).value || "";
@@ -442,10 +377,10 @@
             }
             var pwEl = document.getElementById("affiliate-password");
             if (pwEl) pwEl.value = "";
-            if (x.j.step === "setup" && x.j.qr && qrImg) {
-              qrImg.src = x.j.qr;
+            if (x.j.redirect) {
+              closeModal();
+              window.location.assign(x.j.redirect);
             }
-            show2fa(x.j.step);
           })
           .catch(function () {
             setError("Network error. Check your connection.");
@@ -456,53 +391,6 @@
               btnCred.textContent = btnCredDefault;
             }
           });
-      });
-    }
-
-    function submit2fa() {
-      setError("");
-      if (btn2fa) {
-        btn2fa.disabled = true;
-        btn2fa.textContent = "Signing in…";
-      }
-      var code = ((totpInput && totpInput.value) || "").replace(/\s/g, "");
-      fetch(step2Url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ code: code }),
-      })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (x) {
-          if (!x.ok || !x.j.ok) {
-            if (x.j && x.j.error === "session_expired") {
-              setError("Session expired. Start again from email and password.");
-              showCredentials();
-              return;
-            }
-            setError(x.j && x.j.error === "invalid_code" ? "Invalid code. Check your authenticator app." : "Something went wrong.");
-            return;
-          }
-          if (x.j.redirect) {
-            closeModal();
-            window.location.assign(x.j.redirect);
-          }
-        })
-        .catch(function () {
-          setError("Network error. Check your connection.");
-        })
-        .finally(function () {
-          if (btn2fa) {
-            btn2fa.disabled = false;
-            btn2fa.textContent = btn2faDefault;
-          }
-        });
-    }
-
-    if (btn2fa) btn2fa.addEventListener("click", submit2fa);
-    if (totpInput) {
-      totpInput.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") submit2fa();
       });
     }
   })();

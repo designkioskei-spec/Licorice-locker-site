@@ -3,7 +3,7 @@
 {% block content %}
 <section class="panel narrow">
   <h1>Staff sign in</h1>
-  <p class="muted">Administrator access only. Members use <strong>Listening Room sign in</strong> in the site footer (two-factor authentication).</p>
+  <p class="muted">Administrator access only. Members use <strong>Listening Room sign in</strong> in the site footer (email and password).</p>
   <form method="post" class="form-stack" action="{{ url_for('login') }}">
     <label>Email
       <input type="email" name="email" required autocomplete="username">

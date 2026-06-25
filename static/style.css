@@ -3461,27 +3461,6 @@ body.affiliate-modal-open {
   line-height: 1.5;
 }
 
-.affiliate-modal-step--2fa .affiliate-modal-hint {
-  margin: 0 0 0.5rem;
-}
-
-.affiliate-modal-step--2fa .affiliate-modal-qr-wrap {
-  margin-bottom: 0.5rem;
-}
-
-.affiliate-modal-step--2fa .affiliate-field {
-  margin-bottom: 0.65rem;
-}
-
-.affiliate-modal-step--2fa .affiliate-modal-primary {
-  margin-top: 0.15rem;
-}
-
-.affiliate-modal-step--2fa .affiliate-modal-back {
-  margin-top: 0.65rem;
-  margin-bottom: 0;
-}
-
 .affiliate-modal-error {
   margin: 0 0 0.75rem;
   padding: 0.5rem 0.65rem;
@@ -3534,53 +3513,6 @@ body.affiliate-modal-open {
 .affiliate-modal-forgot a {
   color: var(--accent);
   font-weight: 600;
-}
-
-.affiliate-modal-hint {
-  margin: 0 0 0.75rem;
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.affiliate-modal-hint--below-error {
-  margin: 0 0 0.75rem;
-  color: var(--muted);
-  font-size: 0.8125rem;
-}
-
-.affiliate-modal-hint--below-error a {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.affiliate-modal-qr-wrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 0.75rem;
-}
-
-.affiliate-modal-qr {
-  border-radius: 12px;
-  border: 1px solid var(--hairline);
-}
-
-.affiliate-modal-back {
-  margin: 0.75rem 0 0;
-  text-align: center;
-}
-
-.affiliate-modal-text-btn {
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: 0.875rem;
-  cursor: pointer;
-  text-decoration: underline;
-  font-family: inherit;
-}
-
-.affiliate-modal-text-btn:hover {
-  color: var(--accent);
 }
 
 .forgot-password-page h1 {
