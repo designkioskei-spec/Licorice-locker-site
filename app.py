@@ -350,6 +350,72 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
+_public_guest_user_cache: Optional[User] = None
+
+
+def auth_required() -> bool:
+    return feature_flags.AUTH_REQUIRED
+
+
+def can_access_admin(user: Optional[User] = None) -> bool:
+    """Admin routes: open to all when AUTH_REQUIRED is False."""
+    if not feature_flags.AUTH_REQUIRED:
+        return True
+    return _user_is_effective_admin(user)
+
+
+@app.template_global()
+def can_access_admin_ui() -> bool:
+    return can_access_admin()
+
+
+def _resolve_public_guest_user() -> Optional[User]:
+    """Shared guest account for dashboards when auth is disabled (env override supported)."""
+    global _public_guest_user_cache
+    if _public_guest_user_cache is not None:
+        return _public_guest_user_cache
+    email = (os.environ.get("PUBLIC_GUEST_USER_EMAIL") or "").strip()
+    with database.get_db() as conn:
+        row = database.user_by_email(conn, email) if email else None
+        if row is None:
+            row = conn.execute(
+                """
+                SELECT * FROM users
+                WHERE role = 'affiliate' AND COALESCE(affiliate_active, 1) = 1
+                ORDER BY id
+                LIMIT 1
+                """
+            ).fetchone()
+        if row is None:
+            row = conn.execute("SELECT * FROM users ORDER BY id LIMIT 1").fetchone()
+    if row:
+        _public_guest_user_cache = User(row)
+    return _public_guest_user_cache
+
+
+def _ensure_public_guest() -> None:
+    if feature_flags.AUTH_REQUIRED:
+        return
+    if current_user.is_authenticated:
+        return
+    guest = _resolve_public_guest_user()
+    if guest:
+        login_user(guest, remember=False)
+
+
+@login_manager.unauthorized_handler
+def _login_manager_unauthorized():
+    if not feature_flags.AUTH_REQUIRED:
+        _ensure_public_guest()
+        return redirect(request.url)
+    return redirect(url_for("login", next=request.url))
+
+
+@app.before_request
+def _before_request_public_guest():
+    if not feature_flags.AUTH_REQUIRED:
+        _ensure_public_guest()
+
 
 def _absolute_site_url(relative_path: str) -> str:
     """If SITE_URL is set (e.g. https://licorice-locker.com), return absolute URLs for header links."""
@@ -426,6 +492,7 @@ def inject_feature_flags() -> Dict[str, Any]:
     return {
         "soundwave_enabled": feature_flags.SOUNDWAVE_ENABLED,
         "nav_menu_items": _nav_menu_items_visible(),
+        "auth_required": feature_flags.AUTH_REQUIRED,
     }
 
 
@@ -945,7 +1012,7 @@ def inject_stripe_public() -> Dict[str, Any]:
 def inject_analytics_public() -> Dict[str, Any]:
     """Storefront-only tracker: skip admin + affiliate member dashboards + staff login."""
     p = request.path or ""
-    analytics_public = not (
+    analytics_public = feature_flags.AUTH_REQUIRED is False or not (
         p.startswith("/dashboard/admin")
         or p.startswith("/dashboard/affiliate")
         or p.startswith("/login")
@@ -955,12 +1022,16 @@ def inject_analytics_public() -> Dict[str, Any]:
 
 @app.route("/login/affiliate", methods=["GET"])
 def affiliate_login():
+    if not feature_flags.AUTH_REQUIRED:
+        return redirect(url_for("affiliate_dashboard"))
     return redirect(url_for("shop", open_affiliate_login="1"))
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     """Staff (admin) sign-in only. Members use the footer Listening Room modal + two-factor auth."""
+    if not feature_flags.AUTH_REQUIRED:
+        return redirect(url_for("admin_dashboard"))
     if current_user.is_authenticated:
         return redirect(_dashboard_for_role())
     if request.method == "POST":
@@ -1000,6 +1071,8 @@ def login():
 @app.route("/auth/affiliate/signup", methods=["POST"])
 def auth_affiliate_signup():
     """Create Listening Room member account (hashed password, unique email, generated code). Log in; redirect to dashboard."""
+    if not feature_flags.AUTH_REQUIRED:
+        return redirect(url_for("affiliate_dashboard"))
     ct = (request.content_type or "").lower()
     wants_json = "application/json" in ct
     if wants_json:
@@ -1090,6 +1163,8 @@ def auth_affiliate_signup():
 @app.route("/auth/affiliate/step1", methods=["POST"])
 def auth_affiliate_step1():
     """Listening Room: existing user → password → 2FA; new user → create → same 2FA flow (no dead ends)."""
+    if not feature_flags.AUTH_REQUIRED:
+        return jsonify({"ok": True, "redirect": url_for("affiliate_dashboard")})
     data = request.get_json(force=True, silent=True) or {}
     email = database.normalize_email(data.get("email") or "")
     password = data.get("password") or ""
@@ -1206,6 +1281,8 @@ def auth_affiliate_step1():
 @app.route("/auth/affiliate/step2", methods=["POST"])
 def auth_affiliate_step2():
     """Verify TOTP code; complete Listening Room sign-in (and confirm device on first setup)."""
+    if not feature_flags.AUTH_REQUIRED:
+        return jsonify({"ok": True, "redirect": url_for("affiliate_dashboard")})
     data = request.get_json(silent=True) or {}
     code = (data.get("code") or "").replace(" ", "").strip()
     if not code or len(code) < 6:
@@ -1247,6 +1324,8 @@ def auth_affiliate_step2():
 
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
+    if not feature_flags.AUTH_REQUIRED:
+        return redirect(url_for("shop"))
     if request.method == "POST":
         email = database.normalize_email(request.form.get("email", ""))
         with database.get_db() as conn:
@@ -1264,6 +1343,8 @@ def forgot_password():
 
 @app.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token: str):
+    if not feature_flags.AUTH_REQUIRED:
+        return redirect(url_for("shop"))
     with database.get_db() as conn:
         row = database.user_by_affiliate_reset_token(conn, token)
     if not row:
@@ -1332,8 +1413,11 @@ def _dashboard_for_role(u: Optional[User] = None) -> str:
 
 
 @app.route("/logout")
-@login_required
 def logout():
+    if not feature_flags.AUTH_REQUIRED:
+        return redirect(url_for("shop"))
+    if not current_user.is_authenticated:
+        return redirect(url_for("shop"))
     logout_user()
     return redirect(url_for("shop"))
 
@@ -1397,6 +1481,8 @@ def listening_room_join_invite():
     """Optional invite: /join?token=… stores token in session when LISTENING_ROOM_INVITES_REQUIRED is used."""
     if not _listening_room_invites_required():
         logger.info("listening_room_join skipped invites_not_required open_signup_mode")
+        if not feature_flags.AUTH_REQUIRED:
+            return redirect(url_for("affiliate_dashboard"))
         return redirect(url_for("listening_room_program", open_affiliate_login="1"))
     token = (request.args.get("token") or "").strip()
     if not token:
@@ -1412,6 +1498,8 @@ def listening_room_join_invite():
         "Invite verified. Use Listening Room sign in in the footer — use the email this invite was issued for.",
         "ok",
     )
+    if not feature_flags.AUTH_REQUIRED:
+        return redirect(url_for("affiliate_dashboard"))
     return redirect(url_for("listening_room_program", open_affiliate_login="1"))
 
 
@@ -1421,9 +1509,14 @@ def listening_room_program():
     Public page: The Listening Room — culture-first conversion.
     Member shops live at /listening-room/<member_code> (separate route).
     """
+    signup_target = (
+        url_for("shop", open_affiliate_signup="1")
+        if feature_flags.AUTH_REQUIRED
+        else url_for("affiliate_dashboard")
+    )
     return render_template(
         "listening_room_program.html",
-        signup_url=url_for("shop", open_affiliate_signup="1"),
+        signup_url=signup_target,
         shop_url=url_for("shop"),
         soundwave_cents=int(LIST_PRICE_SOUNDWAVE_NZD * 100),
         mini_cents=int(LIST_PRICE_MINI_SERIES_NZD * 100),
@@ -2802,7 +2895,7 @@ def affiliate_bank_details_save():
 @app.route("/dashboard/admin/mark-affiliate-paid", methods=["POST"])
 @login_required
 def admin_mark_affiliate_paid():
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return redirect(url_for("affiliate_dashboard"))
     search_q = (request.form.get("search_q") or "").strip()
     sa_q = (request.form.get("sa_q") or "").strip()
@@ -3343,7 +3436,7 @@ def _url_admin_dashboard_preserve(q_orders: str, q_sa: str) -> str:
 @app.route("/dashboard/admin")
 @login_required
 def admin_dashboard():
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return redirect(url_for("affiliate_dashboard"))
     search_q = (request.args.get("q") or "").strip()
     sa_q = (request.args.get("sa_q") or "").strip()
@@ -3383,7 +3476,7 @@ def admin_dashboard():
 @login_required
 def admin_affiliate_alias(code: str):
     """Short URL → affiliate orders drill-down (admin only)."""
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return redirect(url_for("shop"))
     return redirect(url_for("admin_affiliate_orders", code=code))
 
@@ -3392,7 +3485,7 @@ def admin_affiliate_alias(code: str):
 @login_required
 def admin_order_alias(order_number: str):
     """Short URL → admin order detail (admin only)."""
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return redirect(url_for("shop"))
     return redirect(url_for("admin_order_detail_ref", order_number=order_number))
 
@@ -3401,7 +3494,7 @@ def admin_order_alias(order_number: str):
 @login_required
 def admin_affiliate_orders(code: str):
     """All orders for one Listening Room member (by affiliate code)."""
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return redirect(url_for("affiliate_dashboard"))
     dq = (request.args.get("dq") or "").strip()
     dsa = (request.args.get("dsa") or "").strip()
@@ -3431,7 +3524,7 @@ def admin_affiliate_orders(code: str):
 @app.route("/dashboard/admin/order/<int:order_id>/fulfillment", methods=["POST"])
 @login_required
 def admin_order_fulfillment(order_id: int):
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return redirect(url_for("affiliate_dashboard"))
     fulfilled = request.form.get("fulfilled") == "1"
     search_q = (request.form.get("search_q") or "").strip()
@@ -3502,7 +3595,7 @@ def admin_order_fulfillment(order_id: int):
 @app.route("/dashboard/admin/creative-library", methods=["POST"])
 @login_required
 def admin_creative_library_upload():
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return redirect(url_for("affiliate_dashboard"))
     main = request.files.get("file")
     if not main or not main.filename or not main.filename.strip():
@@ -3540,7 +3633,7 @@ def admin_creative_library_upload():
 @app.route("/dashboard/admin/creative-library/<int:asset_id>/delete", methods=["POST"])
 @login_required
 def admin_creative_library_delete(asset_id: int):
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return redirect(url_for("affiliate_dashboard"))
     with database.get_db() as conn:
         row = database.delete_creative_asset(conn, asset_id)
@@ -3556,7 +3649,7 @@ def admin_creative_library_delete(asset_id: int):
 
 def _admin_order_detail_response(order_id: int):
     """Shared handler: order detail page (by id). GET shows breakdown; POST action=tracking saves tracking only."""
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return redirect(url_for("affiliate_dashboard"))
     with database.get_db() as conn:
         order = conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
@@ -3629,7 +3722,7 @@ def admin_order_detail(order_id: int):
 @app.route("/api/admin/summary")
 @login_required
 def api_admin_summary():
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return jsonify({"error": "forbidden"}), 403
     with database.get_db() as conn:
         order_count = conn.execute("SELECT COUNT(*) AS c FROM orders").fetchone()["c"]
@@ -3726,7 +3819,7 @@ def _analytics_period_start_iso(days: int) -> Optional[str]:
 @app.route("/api/admin/analytics", methods=["GET"])
 @login_required
 def api_admin_analytics():
-    if not _user_is_effective_admin():
+    if not can_access_admin():
         return jsonify({"error": "forbidden"}), 403
     try:
         days = int((request.args.get("days") or "0").strip() or "0")

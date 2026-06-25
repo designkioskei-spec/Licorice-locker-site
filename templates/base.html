@@ -85,6 +85,7 @@
         </a>
         {% endfor %}
       </nav>
+      {% if auth_required %}
       {% if current_user.is_authenticated %}
       <div class="slide-menu-auth" aria-label="Listening Room account">
         {% if user_is_effective_admin() %}
@@ -93,6 +94,14 @@
         {% else %}
           <a class="slide-menu-link" href="{{ url_for('affiliate_dashboard') }}">Your Listening Room</a>
           <a class="slide-menu-link slide-menu-link--subtle" href="{{ url_for('logout') }}">Log out</a>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% else %}
+      <div class="slide-menu-auth" aria-label="Member tools">
+        <a class="slide-menu-link" href="{{ url_for('affiliate_dashboard') }}">Your Listening Room</a>
+        {% if can_access_admin_ui() %}
+        <a class="slide-menu-link" href="{{ url_for('admin_dashboard') }}">Admin</a>
         {% endif %}
       </div>
       {% endif %}
@@ -174,7 +183,7 @@
         <div class="site-footer-logo">
           <img src="{{ url_for('static', filename='logo.png') }}" alt="Licorice Locker" width="180" height="44" decoding="async">
         </div>
-        {% if not current_user.is_authenticated %}
+        {% if auth_required and not current_user.is_authenticated %}
         <div class="site-footer-brand-aside">
           <button type="button" class="btn primary site-footer-signin-btn" id="affiliate-login-open-btn" aria-haspopup="dialog" aria-controls="affiliate-login-modal">Sign in</button>
           <p class="site-footer-copy">
@@ -188,6 +197,7 @@
         {% endif %}
       </div>
     </div>
+    {% if auth_required %}
     {% if current_user.is_authenticated and not user_is_effective_admin() %}
     <div class="site-footer-bottom">
       <a href="{{ url_for('affiliate_dashboard') }}" class="site-footer-lr-link site-footer-lr-link--member">Your Listening Room</a>
@@ -200,9 +210,20 @@
       </div>
     </div>
     {% endif %}
+    {% else %}
+    <div class="site-footer-bottom">
+      <div class="site-footer-bottom-links">
+        <a href="{{ url_for('affiliate_dashboard') }}" class="site-footer-lr-link">Your Listening Room</a>
+        {% if can_access_admin_ui() %}
+        <a href="{{ url_for('admin_dashboard') }}" class="site-footer-lr-link">Admin</a>
+        {% endif %}
+        <a href="{{ url_for('listening_room_program') }}" class="site-footer-lr-link">The Listening Room</a>
+      </div>
+    </div>
+    {% endif %}
   </footer>
 
-  {% if not current_user.is_authenticated %}
+  {% if auth_required and not current_user.is_authenticated %}
   <div id="affiliate-login-modal" class="affiliate-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="affiliate-modal-title">
     <div class="affiliate-modal-backdrop" tabindex="-1"></div>
     <div class="affiliate-modal-panel">

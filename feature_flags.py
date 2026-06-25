@@ -9,6 +9,9 @@ from __future__ import annotations
 SOUNDWAVE_ENABLED = False
 SOUNDWAVE_SLUG = "sound-wave"
 
+# —— Public access mode (no login friction; set True to restore authentication) ——
+AUTH_REQUIRED = False
+
 
 def is_soundwave_slug(slug: str | None) -> bool:
     return (slug or "").strip().lower() == SOUNDWAVE_SLUG
