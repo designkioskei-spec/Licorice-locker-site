@@ -1,12 +1,12 @@
-"""Storefront feature flags — flip to re-enable archived products.
+"""Storefront feature flags — flip to temporarily freeze archived products.
 
-Soundwave Disabled: set SOUNDWAVE_ENABLED = True to restore Sound Wave everywhere.
+Set SOUNDWAVE_ENABLED = False to hide Sound Wave everywhere (code/assets preserved).
 """
 
 from __future__ import annotations
 
-# —— Soundwave Disabled (temporary freeze; all code/assets preserved) ——
-SOUNDWAVE_ENABLED = False
+# —— Soundwave (set False to temporarily freeze storefront visibility) ——
+SOUNDWAVE_ENABLED = True
 SOUNDWAVE_SLUG = "sound-wave"
 
 
